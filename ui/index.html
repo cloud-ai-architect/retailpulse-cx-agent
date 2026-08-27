@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RetailPulse Knowledge Base</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="logo">🛍️</span>
+        <h1>RetailPulse KB</h1>
+      </div>
+      <div class="header-meta">
+        <span class="env-badge" id="env-badge">dev</span>
+        <span class="stats" id="stats">
+          <span class="stat" id="stat-results">0 results</span>
+          <span class="stat" id="stat-duration">—</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <aside class="sidebar">
+      <section class="search-section">
+        <h2>Ask RetailPulse</h2>
+        <input type="search" id="search-input" placeholder="Ask about products, returns, shipping..." autofocus>
+        <div class="search-options">
+          <label>Top K:
+            <input type="number" id="top-k" value="10" min="1" max="100">
+          </label>
+        </div>
+        <button id="search-btn" class="primary-btn">Search</button>
+      </section>
+
+      <section class="filters-section">
+        <h2>Filters</h2>
+        <label>Source
+          <select id="filter-source">
+            <option value="">All</option>
+            <option value="catalog">Catalog</option>
+            <option value="faq">FAQ</option>
+            <option value="policy">Policy</option>
+          </select>
+        </label>
+        <label>Min score
+          <input type="range" id="min-score" min="0" max="1" step="0.05" value="0">
+          <span id="min-score-value">0.00</span>
+        </label>
+        <button id="reset-filters" class="secondary-btn">Reset</button>
+      </section>
+
+      <section class="feedback-section">
+        <h2>Rate this search</h2>
+        <div class="rating" id="rating-stars">
+          <span data-rating="1">★</span>
+          <span data-rating="2">★</span>
+          <span data-rating="3">★</span>
+          <span data-rating="4">★</span>
+          <span data-rating="5">★</span>
+        </div>
+        <textarea id="feedback-comments" placeholder="Optional comments..."></textarea>
+        <button id="feedback-btn" class="secondary-btn">Submit feedback</button>
+      </section>
+    </aside>
+
+    <section class="results-pane">
+      <div id="results" class="results">
+        <div class="empty-state">
+          <h2>Search the RetailPulse knowledge base</h2>
+          <p>Try queries like "what's your return policy", "do you ship internationally", or "Oxford shirt blue M".</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

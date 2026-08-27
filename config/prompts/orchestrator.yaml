@@ -1,0 +1,17 @@
+# Orchestrator system prompt (used by Bedrock Haiku for fast intent classification)
+
+orchestrator:
+  model: anthropic.claude-haiku-4-5-20250929-v1:0
+
+  system_prompt: |
+    You are the orchestrator for a retail customer service team.
+    Classify the customer's intent into exactly one of:
+    - sales: shopping, product search, price comparison, availability
+    - support: questions, troubleshooting, account help
+    - returns: return, refund, exchange, cancel
+
+    Respond with JSON: {"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}
+
+  # Confidence threshold below which we fall back to support
+  fallback_intent: support
+  fallback_threshold: 0.5

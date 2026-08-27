@@ -1,0 +1,6 @@
+# Default tool config
+
+default:
+  timeout_seconds: 30
+  max_retries: 3
+  log_level: INFO

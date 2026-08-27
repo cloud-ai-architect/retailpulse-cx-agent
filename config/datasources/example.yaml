@@ -1,0 +1,33 @@
+# Example data source config
+# Copy this file to define a new data source.
+#
+# In v1, the catalog is a single S3 object (master.json).
+# In v2, multiple data sources can be defined here.
+
+name: example-source
+description: Example configuration for a new data source
+enabled: true
+
+# Where in S3 to find files
+s3:
+  bucket: retailpulse-dev-catalog
+  prefix: catalog/
+
+# Parser config
+parser: default
+
+# Chunker config
+chunker: default
+
+# Embedder config
+embedder: titan-v2
+
+# Classifier config
+classifier: default
+
+# Metadata to attach to every chunk
+metadata:
+  source: example
+
+# Lifecycle
+retention_days: 30
