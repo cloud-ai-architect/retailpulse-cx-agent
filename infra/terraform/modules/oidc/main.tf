@@ -5,12 +5,19 @@ terraform {
   }
 }
 
-variable "oidc_url" { type = string }
-variable "client_id" { type = string }
-variable "thumbprint" { type = string }
+variable "oidc_url" {
+   type = string
+ }
+variable "client_id" {
+  type = string
+}
+variable "thumbprint" {
+  type = string
+}
 variable "common_tags" {
-  type    = map(string)
-  default = {}
+  type = map(string)
+  default = {
+}
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -20,4 +27,6 @@ resource "aws_iam_openid_connect_provider" "github" {
   tags            = var.common_tags
 }
 
-output "provider_arn" { value = aws_iam_openid_connect_provider.github.arn }
+output "provider_arn" {
+   value = aws_iam_openid_connect_provider.github.arn
+ }

@@ -43,9 +43,9 @@ resource "aws_iam_role" "github_actions" {
 
 data "aws_iam_policy_document" "github_actions_inline" {
   statement {
-    sid     = "AllActionsOnRetailPulse"
-    effect  = "Allow"
-    actions = ["*"]
+    sid       = "AllActionsOnRetailPulse"
+    effect    = "Allow"
+    actions   = ["*"]
     resources = ["*"]
 
     condition {
@@ -349,33 +349,30 @@ resource "aws_iam_role_policy" "eventbridge" {
 # --- Outputs ---
 
 output "github_actions_role_arn" {
-  value = aws_iam_role.github_actions.arn
-}
-
+   value = aws_iam_role.github_actions.arn
+ }
 output "lambda_role_arn" {
-  value = aws_iam_role.lambda_exec.arn
-}
-
+   value = aws_iam_role.lambda_exec.arn
+ }
 output "lambda_role_arns" {
-  value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn }
+   value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
+ }
 }
 
 output "api_role_arn" {
-  value = aws_iam_role.lambda_exec.arn
-}
-
+   value = aws_iam_role.lambda_exec.arn
+ }
 output "api_role_arns" {
-  value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn }
+   value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
+ }
 }
 
 output "vectors_role_arn" {
-  value = aws_iam_role.vectors.arn
-}
-
+   value = aws_iam_role.vectors.arn
+ }
 output "step_function_role_arn" {
-  value = aws_iam_role.step_function.arn
-}
-
+   value = aws_iam_role.step_function.arn
+ }
 output "eventbridge_role_arn" {
-  value = aws_iam_role.eventbridge.arn
-}
+   value = aws_iam_role.eventbridge.arn
+ }

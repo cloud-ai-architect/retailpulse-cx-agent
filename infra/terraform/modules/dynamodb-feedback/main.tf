@@ -5,18 +5,31 @@ terraform {
   }
 }
 
-variable "table_name" { type = string }
-variable "common_tags" { type = map(string); default = {} }
-
+variable "table_name" {
+   type = string
+ }
+variable "common_tags" {
+  type = map(string)
+  default = {}
+}
 resource "aws_dynamodb_table" "this" {
   name         = var.table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "feedback_id"
   tags         = var.common_tags
 
-  attribute { name = "feedback_id"; type = "S" }
-  attribute { name = "session_id"; type = "S" }
-  attribute { name = "created_at"; type = "S" }
+  attribute {
+    name = "feedback_id"
+    type = "S"
+  }
+  attribute {
+    name = "session_id"
+    type = "S"
+  }
+  attribute {
+    name = "created_at"
+    type = "S"
+  }
 
   global_secondary_index {
     name            = "session-index"
@@ -34,4 +47,6 @@ resource "aws_dynamodb_table" "this" {
   server_side_encryption { enabled = true }
 }
 
-output "table_arn" { value = aws_dynamodb_table.this.arn }
+output "table_arn" {
+   value = aws_dynamodb_table.this.arn
+ }

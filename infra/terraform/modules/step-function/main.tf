@@ -5,11 +5,19 @@ terraform {
   }
 }
 
-variable "name_prefix" { type = string }
-variable "state_machine_arn" { type = string }
-variable "lambda_arns" { type = map(string) }
-variable "common_tags" { type = map(string); default = {} }
-
+variable "name_prefix" {
+   type = string
+ }
+variable "state_machine_arn" {
+  type = string
+}
+variable "lambda_arns" {
+  type = map(string)
+}
+variable "common_tags" {
+  type = map(string)
+  default = {}
+}
 locals {
   asl_definition = jsonencode({
     Comment = "RetailPulse conversation pipeline"
@@ -128,5 +136,9 @@ resource "aws_sfn_state_machine" "this" {
   tags = var.common_tags
 }
 
-output "state_machine_arn" { value = aws_sfn_state_machine.this.arn }
-output "state_machine_name" { value = aws_sfn_state_machine.this.name }
+output "state_machine_arn" {
+   value = aws_sfn_state_machine.this.arn
+ }
+output "state_machine_name" {
+  value = aws_sfn_state_machine.this.name
+}

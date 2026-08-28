@@ -5,11 +5,19 @@ terraform {
   }
 }
 
-variable "name_prefix" { type = string }
-variable "search_lambda" { type = string }
-variable "feedback_lambda" { type = string }
-variable "common_tags" { type = map(string); default = {} }
-
+variable "name_prefix" {
+   type = string
+ }
+variable "search_lambda" {
+  type = string
+}
+variable "feedback_lambda" {
+  type = string
+}
+variable "common_tags" {
+  type = map(string)
+  default = {}
+}
 resource "aws_apigatewayv2_api" "this" {
   name          = "${var.name_prefix}-api"
   protocol_type = "HTTP"
@@ -82,6 +90,12 @@ resource "aws_lambda_permission" "feedback" {
   source_arn    = "${aws_apigatewayv2_api.this.execution_arn}/*/*"
 }
 
-output "api_id"     { value = aws_apigatewayv2_api.this.id }
-output "api_url"    { value = aws_apigatewayv2_api.this.api_endpoint }
-output "stage_name" { value = aws_apigatewayv2_stage.this.name }
+output "api_id"     {
+   value = aws_apigatewayv2_api.this.id
+ }
+output "api_url"    {
+  value = aws_apigatewayv2_api.this.api_endpoint
+}
+output "stage_name" {
+  value = aws_apigatewayv2_stage.this.name
+}

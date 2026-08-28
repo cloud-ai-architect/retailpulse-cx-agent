@@ -5,12 +5,23 @@ terraform {
   }
 }
 
-variable "name_prefix" { type = string }
-variable "ui_bucket" { type = string }
-variable "api_url" { type = string }
-variable "enabled" { type = bool; default = true }
-variable "common_tags" { type = map(string); default = {} }
-
+variable "name_prefix" {
+   type = string
+ }
+variable "ui_bucket" {
+  type = string
+}
+variable "api_url" {
+  type = string
+}
+variable "enabled" {
+  type = bool
+  default = true
+}
+variable "common_tags" {
+  type = map(string)
+  default = {}
+}
 resource "aws_cloudfront_origin_access_control" "this" {
   name                              = "${var.name_prefix}-oac"
   description                       = "OAC for ${var.ui_bucket}"
@@ -58,5 +69,9 @@ resource "aws_cloudfront_distribution" "this" {
   }
 }
 
-output "distribution_id"     { value = aws_cloudfront_distribution.this.id }
-output "distribution_domain" { value = aws_cloudfront_distribution.this.domain_name }
+output "distribution_id"     {
+   value = aws_cloudfront_distribution.this.id
+ }
+output "distribution_domain" {
+  value = aws_cloudfront_distribution.this.domain_name
+}

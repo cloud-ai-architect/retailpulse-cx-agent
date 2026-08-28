@@ -10,8 +10,8 @@ locals {
   }
 
   tables = {
-    orders      = "${local.name_prefix}-orders"
-    feedback    = "${local.name_prefix}-feedback"
+    orders       = "${local.name_prefix}-orders"
+    feedback     = "${local.name_prefix}-feedback"
     coversations = "${local.name_prefix}-conversations"
   }
 
@@ -109,22 +109,22 @@ module "conversations_dynamodb" {
 module "lambdas" {
   source = "./modules/lambdas"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  name_prefix         = local.name_prefix
-  lambdas             = local.lambdas
-  lambda_runtime      = var.lambda_runtime
-  lambda_memory_mb    = var.lambda_memory_mb
-  lambda_timeout      = var.lambda_timeout_seconds
-  buckets             = local.buckets
-  tables              = local.tables
-  vector_index_name   = local.vector_index_name
-  bedrock_model_id    = var.bedrock_model_id
-  haiku_model_id      = var.bedrock_haiku_model_id
-  lambda_role_arns    = module.iam.lambda_role_arns
-  api_role_arns       = module.iam.api_role_arns
-  log_retention_days  = var.log_retention_days
-  common_tags         = local.common_tags
+  project_name       = var.project_name
+  environment        = var.environment
+  name_prefix        = local.name_prefix
+  lambdas            = local.lambdas
+  lambda_runtime     = var.lambda_runtime
+  lambda_memory_mb   = var.lambda_memory_mb
+  lambda_timeout     = var.lambda_timeout_seconds
+  buckets            = local.buckets
+  tables             = local.tables
+  vector_index_name  = local.vector_index_name
+  bedrock_model_id   = var.bedrock_model_id
+  haiku_model_id     = var.bedrock_haiku_model_id
+  lambda_role_arns   = module.iam.lambda_role_arns
+  api_role_arns      = module.iam.api_role_arns
+  log_retention_days = var.log_retention_days
+  common_tags        = local.common_tags
 }
 
 module "step_function" {

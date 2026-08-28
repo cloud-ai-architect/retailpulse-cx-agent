@@ -5,10 +5,16 @@ terraform {
   }
 }
 
-variable "name_prefix" { type = string }
-variable "environment" { type = string }
-variable "common_tags" { type = map(string); default = {} }
-
+variable "name_prefix" {
+   type = string
+ }
+variable "environment" {
+  type = string
+}
+variable "common_tags" {
+  type = map(string)
+  default = {}
+}
 resource "aws_resourcegroups_group" "this" {
   name        = "rg-${var.name_prefix}"
   description = "RetailPulse ${var.environment} resources"
@@ -26,5 +32,9 @@ resource "aws_resourcegroups_group" "this" {
   tags = var.common_tags
 }
 
-output "arn"  { value = aws_resourcegroups_group.this.arn }
-output "name" { value = aws_resourcegroups_group.this.name }
+output "arn"  {
+   value = aws_resourcegroups_group.this.arn
+ }
+output "name" {
+  value = aws_resourcegroups_group.this.name
+}
