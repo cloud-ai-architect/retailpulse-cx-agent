@@ -1,8 +1,5 @@
-###############################################################################
+﻿###############################################################################
 # DataCurator - Root Terraform Configuration
-# -----------------------------------------------------------------------------
-# Provisions the full DataCurator stack: S3 buckets, DynamoDB, Lambdas, Step
-# Function, API Gateway, CloudFront, IAM, and Resource Group.
 ###############################################################################
 
 terraform {
@@ -23,8 +20,11 @@ terraform {
     }
   }
 
-  # Backend is configured via -backend-config flags; see scripts/bootstrap.sh
   backend "s3" {
+    bucket = "retailpulse-tfstate-dev"
+    key    = "retailpulse.tfstate"
+    region = "ap-south-1"
+    encrypt = true
   }
 }
 
