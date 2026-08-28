@@ -5,28 +5,19 @@ terraform {
   }
 }
 
-variable "oidc_url" {
-   type = string
- }
-variable "client_id" {
-  type = string
-}
-variable "thumbprint" {
+variable "arn" {
   type = string
 }
 variable "common_tags" {
   type = map(string)
-  default = {
-}
+  default = {}
 }
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url             = var.oidc_url
-  client_id_list  = [var.client_id]
-  thumbprint_list = [var.thumbprint]
-  tags            = var.common_tags
+# Use data source to read existing OIDC provider (created once at account bootstrap)
+data "aws_iam_openid_connect_provider" "github" {
+  arn = var.arn
 }
 
 output "provider_arn" {
-   value = aws_iam_openid_connect_provider.github.arn
+   value = data.aws_iam_openid_connect_provider.github.arn
  }
