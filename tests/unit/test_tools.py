@@ -9,30 +9,83 @@ like this.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 from src.tools import policy, price_compare, refund
 
 
+class FakeOrderTable:
+    """Enough of a DynamoDB Table for the policy lookup."""
+
+    def __init__(self, item: dict[str, Any] | None) -> None:
+        self._item = item
+
+    def get_item(self, Key: dict[str, Any]) -> dict[str, Any]:  # noqa: N803
+        return {"Item": self._item} if self._item else {}
+
+
+def _order(days_ago: int, category: str = "apparel", **extra: Any) -> dict[str, Any]:
+    stamp = datetime.now(UTC) - timedelta(days=days_ago, hours=1)
+    return {
+        "order_id": "ORD-1",
+        "category": category,
+        "total_inr": 2500,
+        "created_at": stamp.isoformat(),
+        **extra,
+    }
+
+
+def _patch_policy_table(monkeypatch: pytest.MonkeyPatch, item: dict[str, Any] | None) -> None:
+    monkeypatch.setattr(policy, "ORDERS_TABLE", "orders")
+
+    class FakeResource:
+        @staticmethod
+        def Table(_name: str) -> FakeOrderTable:  # noqa: N802
+            return FakeOrderTable(item)
+
+    import boto3
+
+    monkeypatch.setattr(boto3, "resource", lambda _svc: FakeResource())
+
+
 class TestReturnPolicy:
-    def test_apparel_inside_window_is_eligible(self) -> None:
-        result = json.loads(policy.check_return_policy("apparel", 10))
+    """The window decision is a rule, not a judgement, which is why it lives
+    in Python. It also derives the elapsed days itself: when that was a tool
+    argument, the model supplied 3 for a 66-day-old order and a customer was
+    told an ineligible return was eligible."""
+
+    def test_apparel_inside_window_is_eligible(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_policy_table(monkeypatch, _order(10))
+        result = json.loads(policy.check_return_policy("ORD-1"))
         assert result["eligible"] is True
         assert result["window_days"] == 30
-        assert result["days_remaining"] == 20
+        assert result["days_since_purchase"] == 10
 
-    def test_electronics_has_the_shorter_window(self) -> None:
-        # 20 days is fine for apparel and too late for electronics. If these
-        # two ever return the same answer, the category mapping has broken.
-        assert json.loads(policy.check_return_policy("apparel", 20))["eligible"] is True
-        assert json.loads(policy.check_return_policy("electronics", 20))["eligible"] is False
+    def test_electronics_has_the_shorter_window(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 20 days is fine for apparel and too late for electronics.
+        _patch_policy_table(monkeypatch, _order(20, "apparel"))
+        assert json.loads(policy.check_return_policy("ORD-1"))["eligible"] is True
+        _patch_policy_table(monkeypatch, _order(20, "electronics"))
+        assert json.loads(policy.check_return_policy("ORD-1"))["eligible"] is False
 
-    def test_boundary_day_is_still_eligible(self) -> None:
-        # The window is inclusive: a customer returning on day 30 of a 30-day
-        # window has met it. Off-by-one here is a refused refund.
-        assert json.loads(policy.check_return_policy("apparel", 30))["eligible"] is True
-        assert json.loads(policy.check_return_policy("apparel", 31))["eligible"] is False
+    def test_the_age_comes_from_the_order_not_the_caller(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The regression: a 66-day-old electronics order is not eligible, no
+        # matter what a model might have believed about its age.
+        _patch_policy_table(monkeypatch, _order(66, "electronics"))
+        result = json.loads(policy.check_return_policy("ORD-1"))
+        assert result["days_since_purchase"] == 66
+        assert result["eligible"] is False
+
+    def test_boundary_day_is_still_eligible(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Inclusive: day 30 of a 30-day window has been met.
+        _patch_policy_table(monkeypatch, _order(30, "apparel"))
+        assert json.loads(policy.check_return_policy("ORD-1"))["eligible"] is True
+        _patch_policy_table(monkeypatch, _order(31, "apparel"))
+        assert json.loads(policy.check_return_policy("ORD-1"))["eligible"] is False
 
     @pytest.mark.parametrize(
         ("category", "expected"),
@@ -44,18 +97,31 @@ class TestReturnPolicy:
             ("", "standard"),
         ],
     )
-    def test_category_mapping(self, category: str, expected: str) -> None:
-        assert json.loads(policy.check_return_policy(category, 1))["policy"] == expected
+    def test_category_mapping(
+        self, category: str, expected: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_policy_table(monkeypatch, _order(1, category))
+        assert json.loads(policy.check_return_policy("ORD-1"))["policy"] == expected
 
-    def test_negative_age_is_rejected_rather_than_allowed(self) -> None:
-        # A negative age means the caller has the dates the wrong way round.
-        # Silently returning "eligible" would approve returns on future orders.
-        result = json.loads(policy.check_return_policy("apparel", -5))
+    def test_unknown_order_is_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_policy_table(monkeypatch, None)
+        assert json.loads(policy.check_return_policy("NOPE"))["error"] == "order not found"
+
+    def test_unusable_date_is_reported_not_guessed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_policy_table(monkeypatch, _order(1) | {"created_at": "not-a-date"})
+        result = json.loads(policy.check_return_policy("ORD-1"))
         assert "error" in result
         assert "eligible" not in result
 
-    def test_conditions_are_returned_for_the_customer(self) -> None:
-        result = json.loads(policy.check_return_policy("electronics", 1))
+    def test_already_refunded_is_surfaced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_policy_table(monkeypatch, _order(5, status="refunded"))
+        assert json.loads(policy.check_return_policy("ORD-1"))["already_refunded"] is True
+
+    def test_conditions_are_returned_for_the_customer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_policy_table(monkeypatch, _order(1, "electronics"))
+        result = json.loads(policy.check_return_policy("ORD-1"))
         assert any("restocking" in c for c in result["conditions"])
 
 

@@ -10,7 +10,25 @@ is true.
 from __future__ import annotations
 
 import json
+import os
+from datetime import UTC, datetime
 from typing import Any
+
+ORDERS_TABLE = os.environ.get("ORDERS_TABLE", "")
+
+
+def _age_in_days(created_at: str) -> int | None:
+    """Whole days between an ISO-8601 purchase timestamp and now, or None."""
+    if not created_at:
+        return None
+    try:
+        stamp = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=UTC)
+    return (datetime.now(UTC) - stamp).days
+
 
 # Window in days, plus the conditions a customer is entitled to hear stated.
 RETURN_POLICY: dict[str, dict[str, Any]] = {
@@ -50,26 +68,22 @@ _CATEGORY_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
 SPEC: dict[str, Any] = {
     "name": "check_return_policy",
     "description": (
-        "Determine whether an item is still within its return window. Call this "
-        "before telling a customer anything about whether they can return "
-        "something -- never answer from memory. Needs the product category and "
-        "how many days ago it was purchased, both of which come from the order "
-        "lookup."
+        "Determine whether an order is still within its return window. Call "
+        "this before telling a customer anything about whether they can "
+        "return something -- never answer from memory, and never estimate "
+        "the age of an order yourself. Takes the order id and works out the "
+        "category and the elapsed days from the order record."
     ),
     "inputSchema": {
         "json": {
             "type": "object",
             "properties": {
-                "category": {
+                "order_id": {
                     "type": "string",
-                    "description": "Product category, e.g. electronics, apparel.",
-                },
-                "days_since_purchase": {
-                    "type": "integer",
-                    "description": "Whole days between the purchase and today.",
+                    "description": "The order the customer wants to return.",
                 },
             },
-            "required": ["category", "days_since_purchase"],
+            "required": ["order_id"],
         }
     },
 }
@@ -83,31 +97,64 @@ def _policy_for(category: str) -> tuple[str, dict[str, Any]]:
     return "standard", RETURN_POLICY["standard"]
 
 
-def check_return_policy(category: str, days_since_purchase: int) -> str:
-    """Decide eligibility and return the policy that produced the decision."""
-    name, policy = _policy_for(category)
-    days = int(days_since_purchase)
-    window = int(policy["window_days"])
+def check_return_policy(order_id: str) -> str:
+    """Decide eligibility from the order record, not from what it is told.
 
-    # A negative age means the caller has the dates the wrong way round.
-    # Saying so is more useful than silently returning "eligible".
-    if days < 0:
+    The elapsed days used to be a parameter, supplied by the model from the
+    order lookup. It got them wrong: asked about a 66-day-old electronics
+    order it passed days_since_purchase=3, and the customer was told an
+    ineligible return was eligible.
+
+    A date subtraction is not a judgement call, so the model no longer makes
+    it. The tool reads created_at from the order and computes the age
+    itself; the model supplies only the order id, which it cannot invent
+    because the lookup returned it.
+    """
+    if not ORDERS_TABLE:
+        return json.dumps({"error": "orders table is not configured"})
+
+    import boto3
+
+    try:
+        order = (
+            boto3.resource("dynamodb")
+            .Table(ORDERS_TABLE)
+            .get_item(Key={"order_id": order_id})
+            .get("Item")
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc), "order_id": order_id})
+
+    if not order:
+        return json.dumps({"error": "order not found", "order_id": order_id})
+
+    created_at = str(order.get("created_at", ""))
+    days = _age_in_days(created_at)
+    if days is None:
         return json.dumps(
             {
-                "error": "days_since_purchase cannot be negative",
-                "category": category,
-                "days_since_purchase": days,
+                "error": "order has no usable purchase date",
+                "order_id": order_id,
+                "created_at": created_at,
             }
         )
 
+    category = str(order.get("category", "") or "")
+    name, policy = _policy_for(category)
+    window = int(policy["window_days"])
+
     return json.dumps(
         {
+            "order_id": order_id,
             "category": category,
             "policy": name,
+            "purchased_at": created_at,
             "days_since_purchase": days,
             "window_days": window,
             "eligible": days <= window,
             "days_remaining": max(0, window - days),
+            "order_total_inr": float(order.get("total_inr", 0)),
+            "already_refunded": order.get("status") == "refunded",
             "conditions": policy["conditions"],
         }
     )

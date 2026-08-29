@@ -29,8 +29,10 @@ class ReturnsAgent(BaseAgent):
 
 Work in this order, every time:
 
-1. lookup_orders to find the order and its category, total and date.
-2. check_return_policy with that category and the days since purchase.
+1. lookup_orders to find the order and its total.
+2. check_return_policy with that order id. It works out the category and
+the elapsed days from the order itself -- do not calculate, estimate or
+pass either of those, and do not reason about dates at all.
 3. Tell the customer the outcome and the relevant conditions.
 4. Only if the return is eligible AND the customer has asked to go ahead, \
 call initiate_refund.

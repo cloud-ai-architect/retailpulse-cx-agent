@@ -63,6 +63,11 @@ resource "aws_cloudfront_distribution" "this" {
     domain_name              = "${var.ui_bucket}.s3.${var.aws_region}.amazonaws.com"
     origin_id                = "S3-${var.ui_bucket}"
     origin_access_control_id = aws_cloudfront_origin_access_control.this.id
+
+    # The site is published under static/, but CloudFront asks the origin
+    # for default_root_object at the root ("/index.html"). Without this the
+    # distribution returns 403 for every request.
+    origin_path = "/static"
   }
 
   default_cache_behavior {

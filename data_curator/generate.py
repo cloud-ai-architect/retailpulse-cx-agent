@@ -189,22 +189,22 @@ def main() -> int:
     print(f"Generating {args.count} products...")
     catalog = generate_catalog(args.count)
     (out / "catalog.json").write_text(json.dumps(catalog, indent=2))
-    print(f"  → {out / 'catalog.json'} ({len(catalog)} items)")
+    print(f"  -> {out / 'catalog.json'} ({len(catalog)} items)")
 
     print(f"Generating {args.customers} customers...")
     customers = generate_customers(args.customers)
     (out / "customers.json").write_text(json.dumps(customers, indent=2))
-    print(f"  → {out / 'customers.json'} ({len(customers)} customers)")
+    print(f"  -> {out / 'customers.json'} ({len(customers)} customers)")
 
     print("Generating orders...")
     orders = generate_orders(customers, catalog, per_customer=3)
     (out / "orders.jsonl").write_text("\n".join(json.dumps(o) for o in orders))
-    print(f"  → {out / 'orders.jsonl'} ({len(orders)} orders)")
+    print(f"  -> {out / 'orders.jsonl'} ({len(orders)} orders)")
 
     print("Generating FAQ + policy docs...")
     (out / "faq.json").write_text(json.dumps(FAQ_DOCS, indent=2))
     (out / "policies.json").write_text(json.dumps(POLICY_DOCS, indent=2))
-    print(f"  → faq.json ({len(FAQ_DOCS)}), policies.json ({len(POLICY_DOCS)})")
+    print(f"  -> faq.json ({len(FAQ_DOCS)}), policies.json ({len(POLICY_DOCS)})")
 
     print("\nDone. Upload to S3:")
     print(f"  aws s3 sync {out}/ s3://retailpulse-dev-catalog/ --region ap-south-1")

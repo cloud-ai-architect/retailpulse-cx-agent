@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from typing import Any, ClassVar
 
@@ -31,15 +32,22 @@ REGION = os.environ.get("AWS_REGION", "ap-south-1")
 # Two tiers. Routing and short factual replies go to the cheap model; the
 # customer-facing agents use the standard one. Both are read from the
 # environment so Terraform stays the single source of truth for model choice.
-MODEL_STANDARD = os.environ.get(
-    "BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-)
-MODEL_FAST = os.environ.get("HAIKU_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+# Amazon Nova rather than Anthropic models: this account has not submitted
+# the Anthropic use-case form, so those return ResourceNotFoundException at
+# invoke time. Nova is enabled, supports the Converse tool-use API these
+# agents depend on, and is the cheaper tier -- which is what the rest of
+# this portfolio runs on.
+MODEL_STANDARD = os.environ.get("BEDROCK_MODEL_ID", "apac.amazon.nova-lite-v1:0")
+MODEL_FAST = os.environ.get("HAIKU_MODEL_ID", "apac.amazon.nova-micro-v1:0")
 
 # A tool-calling conversation that has not resolved after this many rounds is
 # not going to. The cap stops a model that keeps re-calling the same tool from
 # burning the Lambda timeout and the token budget with it.
 MAX_TOOL_TURNS = 6
+
+# Reasoning the model narrates before answering. Non-greedy and DOTALL so a
+# multi-line block is removed whole rather than up to the last tag on a line.
+_THINKING = re.compile(r"<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE)
 
 
 class ModelError(Exception):
@@ -219,11 +227,21 @@ class BaseAgent:
 
     @staticmethod
     def _text_of(message: dict[str, Any]) -> str:
-        """Join the text blocks of a reply, ignoring any non-text blocks."""
+        """Join the text blocks of a reply, ignoring any non-text blocks.
+
+        Nova wraps its reasoning in <thinking> tags and returns it in the
+        same text block as the answer. That is useful in a log and wrong in
+        front of a customer -- it exposes the deliberation and reads as the
+        assistant talking to itself. Stripped here rather than in each
+        agent, so that no caller can forget to.
+        """
         parts = [b["text"] for b in message.get("content", []) if "text" in b]
         if not parts:
             raise ModelError("model reply contained no text")
-        return "\n".join(parts).strip()
+        text = _THINKING.sub("", "\n".join(parts)).strip()
+        if not text:
+            raise ModelError("model reply was entirely reasoning, with no answer")
+        return text
 
     def run(self, *args: Any, **kwargs: Any) -> Any:
         """Entry point: build clients if needed, then hand off to handle()."""
