@@ -30,7 +30,7 @@ jobs:
     # Either add the environment subject to the trust policy or do not
     # declare one. The rest of this portfolio does not, so neither does this.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
