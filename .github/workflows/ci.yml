@@ -113,12 +113,22 @@ jobs:
           VERSION=8.21.2
           curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           tar -xzf gitleaks.tar.gz gitleaks
-          # --log-opts=HEAD scopes the scan to the branch being built.
+
+          # Drop every ref except the branch being built, then scan.
           #
-          # fetch-depth: 0 brings down every branch, and gitleaks would
-          # otherwise scan Dependabot's too. Those carry the same files under
-          # different commit hashes, so a finding accepted in
-          # .gitleaksignore reappears under a fingerprint that did not exist
-          # when the file was written -- and changes again on every rebase.
-          # Each branch is still scanned when its own build runs.
-          ./gitleaks detect --source . --log-opts=HEAD --redact --verbose --no-banner
+          # fetch-depth: 0 brings down all branches, and gitleaks walks the
+          # ones it finds. Dependabot's branches carry the same files under
+          # different commit hashes, so the two findings accepted in
+          # .gitleaksignore reappeared under fingerprints that did not exist
+          # when that file was written -- and would change again on every
+          # rebase. Each branch is still scanned when its own build runs.
+          #
+          # --log-opts=HEAD expresses the same intent and works locally, but
+          # did not take effect on the runner, so this removes the refs
+          # instead of asking gitleaks to ignore them. It touches only the
+          # ephemeral CI clone.
+          git for-each-ref --format='%(refname)' refs/remotes refs/heads \
+            | grep -v "refs/heads/$(git rev-parse --abbrev-ref HEAD)$" \
+            | xargs -r -n1 git update-ref -d
+
+          ./gitleaks detect --source . --redact --verbose --no-banner
