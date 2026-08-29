@@ -1,16 +1,16 @@
 # Accepted historical findings.
 #
 # Both entries are the AWS account id appearing inside example ARNs in the
-# incident-response runbook, committed in 7d57aaf before the runbook was
-# rewritten to use $ACCOUNT_ID. The working tree is clean; these fingerprints
-# only silence the copies that remain in that commit's history.
+# incident-response runbook, committed in c5cfa34 (the initial scaffold)
+# before the runbook was rewritten to use $ACCOUNT_ID. The working tree is
+# clean; these fingerprints only silence the copies in that commit.
 #
 # An account id is not a credential -- it grants nothing on its own -- but it
 # identifies which account this portfolio runs in, which is why the rule
-# exists and why the rule itself is left switched on. Purging it properly
-# means rewriting these five commits and force-pushing.
+# exists and why the rule itself is left switched on. Removing it properly
+# means rewriting the repository's history and force-pushing.
 #
 # Nothing else is ignored. Any new finding, in history or working tree,
 # still fails the build.
-7d57aaf4ba9dcc3aa7092df93f5b3568d9decc73:docs/runbooks/incident-response.md:account-id-arn:48
-7d57aaf4ba9dcc3aa7092df93f5b3568d9decc73:docs/runbooks/incident-response.md:account-id-arn:208
+c5cfa3442d0198b942269cadce49c2c4fa3f2a42:docs/runbooks/incident-response.md:account-id-arn:48
+c5cfa3442d0198b942269cadce49c2c4fa3f2a42:docs/runbooks/incident-response.md:account-id-arn:208
