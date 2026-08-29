@@ -38,8 +38,7 @@ module "iam" {
   project_name      = var.project_name
   environment       = var.environment
   name_prefix       = local.name_prefix
-  github_sub_main   = local.github_sub_main
-  github_sub_pr     = local.github_sub_pr
+  github_subs       = local.github_subs
   github_aud        = local.github_aud
   buckets           = local.buckets
   tables            = local.tables

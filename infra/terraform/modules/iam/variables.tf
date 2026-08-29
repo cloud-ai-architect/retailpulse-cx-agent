@@ -4,11 +4,9 @@ variable "project_name" {
 variable "name_prefix" {
   type = string
 }
-variable "github_sub_main" {
-  type = string
-}
-variable "github_sub_pr" {
-  type = string
+variable "github_subs" {
+  description = "Every OIDC subject allowed to assume the deploy role."
+  type        = list(string)
 }
 variable "github_aud" {
   type = string
