@@ -7,6 +7,12 @@ on:
       - "infra/terraform/**"
       - ".github/workflows/apply.yml"
 
+  # Deploys should not require an infrastructure change to trigger. Without
+  # this, redeploying after fixing a credential or a permission meant pushing
+  # a commit that touched infra/terraform for no reason other than to move
+  # the workflow.
+  workflow_dispatch:
+
 permissions:
   contents: read
   id-token: write
