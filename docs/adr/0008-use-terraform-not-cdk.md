@@ -8,6 +8,7 @@
 ## Context and problem statement
 
 We need to choose an IaC tool for the 50+ AWS resources that RetailPulse will create. The choice affects:
+
 - Who can read/modify infrastructure
 - How reusable the codebase is for the other 14 portfolio projects
 - Long-term maintainability

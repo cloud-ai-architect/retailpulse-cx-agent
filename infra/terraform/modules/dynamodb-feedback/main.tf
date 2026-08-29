@@ -6,10 +6,10 @@ terraform {
 }
 
 variable "table_name" {
-   type = string
- }
+  type = string
+}
 variable "common_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 resource "aws_dynamodb_table" "this" {
@@ -48,5 +48,5 @@ resource "aws_dynamodb_table" "this" {
 }
 
 output "table_arn" {
-   value = aws_dynamodb_table.this.arn
- }
+  value = aws_dynamodb_table.this.arn
+}

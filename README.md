@@ -3,11 +3,11 @@
 > Multi-agent customer experience (CX) suite for retail. Three cooperating agents — Sales, Support, and Returns — share a knowledge base, take natural-language requests, and act on a real retail catalog and order history. Config-driven, cloud-portable, voice-enabled.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Phase_1-yellow.svg)]()
-[![Cloud](https://img.shields.io/badge/Cloud-AWS-orange.svg)]()
-[![Region](https://img.shields.io/badge/Region-ap--south--1-yellow.svg)]()
-[![Framework](https://img.shields.io/badge/Framework-CrewAI-FF6B6B.svg)]()
-[![IaC](https://img.shields.io/badge/IaC-Terraform_≥1.9-7B42BC.svg)]()
+![Status](https://img.shields.io/badge/Status-Phase_1-yellow.svg)
+![Cloud](https://img.shields.io/badge/Cloud-AWS-orange.svg)
+![Region](https://img.shields.io/badge/Region-ap--south--1-yellow.svg)
+![Framework](https://img.shields.io/badge/Framework-CrewAI-FF6B6B.svg)
+![IaC](https://img.shields.io/badge/IaC-Terraform_≥1.9-7B42BC.svg)
 
 ---
 

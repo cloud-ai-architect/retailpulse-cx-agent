@@ -1,100 +1,76 @@
-"""Orchestrator Lambda — classifies intent and dispatches to the right agent.
+"""Orchestrator: route a customer message to the agent that should handle it.
 
-Entry point: API Gateway /v1/conversations
-Exit point: Step Function with intent = sales | support | returns
+Runs on the cheap model tier. Routing is a short classification, and paying
+standard-tier prices for it on every message is the difference between a
+system that is affordable at volume and one that is not.
 """
 
 from __future__ import annotations
 
-import json
-import os
-import time
+from typing import Any
 
-import boto3
-from src.common import (
-    ConversationRequest,
-    DataCuratorModel,
-    JobContext,
-    OrchestratorDecision,
-    BaseLambda,
-    IntentError,
-    stage,
-)
+from src.agent import MODEL_FAST, BaseAgent, ModelError
+from src.lambdas._base import respond, run_stage
+
+INTENTS = ("sales", "support", "returns")
 
 
-INTENT_CLASSIFICATION_PROMPT = """Classify the following customer message into one of these intents:
-- sales: shopping, product search, price comparison, availability
-- support: questions, troubleshooting, account help, general inquiries
-- returns: return, refund, exchange, cancel order
+class Orchestrator(BaseAgent):
+    NAME = "orchestrator"
+    MODEL = MODEL_FAST
 
-Customer message: "{transcript}"
+    SYSTEM_PROMPT = """You route retail customer messages to one of three teams.
 
-Respond with JSON: {{"intent": "sales|support|returns", "confidence": 0.0-1.0, "reasoning": "..."}}
-"""
+sales    - finding a product, availability, sizing, price, whether something \
+is good value.
+support  - an order already placed: where it is, when it arrives, what was \
+charged. Also how the business works: shipping, payment, accounts.
+returns  - returning, refunding, exchanging or cancelling something.
 
+If a message spans two, choose the one the customer most needs resolved. \
+Someone who is angry about a late delivery and mentions returning it wants \
+support unless they explicitly ask to return it.
 
-@stage(name="orchestrator", input_model=ConversationRequest, output_model=OrchestratorDecision)
-class Orchestrator(BaseLambda):
-    def setup(self) -> None:
-        # Bedrock client already set up in BaseLambda
-        pass
+Reply with JSON only, no prose:
+{"intent": "sales|support|returns", "confidence": 0.0-1.0, "reasoning": "one short sentence"}"""
 
-    def handle(self, ctx: JobContext, inp: ConversationRequest) -> OrchestratorDecision:  # type: ignore[override]
-        start = time.perf_counter()
+    def handle(self, transcript: str) -> dict[str, Any]:
+        data = self.invoke_json(f"Customer message: {transcript}", max_tokens=200)
+
+        intent = str(data.get("intent", "")).lower().strip()
+        if intent not in INTENTS:
+            raise ModelError(f"orchestrator returned an unknown intent: {intent!r}")
+
         try:
-            # Use Bedrock Haiku for cheap, fast intent classification
-            response = self.bedrock.invoke_model(
-                modelId="anthropic.claude-haiku-4-5-20250929-v1:0",  # if not avail, fallback
-                contentType="application/json",
-                accept="application/json",
-                body=json.dumps({
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 200,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": INTENT_CLASSIFICATION_PROMPT.format(transcript=inp.transcript)
-                        }
-                    ]
-                }),
-            )
-            result = json.loads(response["body"].read())
-            text = result["content"][0]["text"]
-            # Parse JSON from text (may have ```json ... ```)
-            text = text.strip().strip("`").removeprefix("json").strip()
-            data = json.loads(text)
+            confidence = float(data.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
 
-            return OrchestratorDecision(
-                intent=data["intent"],
-                confidence=float(data.get("confidence", 0.8)),
-                reasoning=data.get("reasoning", ""),
-                context_for_agent={
-                    "customer_id": inp.customer_id,
-                    "session_id": inp.session_id,
-                    "channel": inp.channel,
-                    **(inp.context or {}),
-                },
-            )
-        except Exception as exc:
-            self.log.error("orchestrator.classify_failed", error=str(exc))
-            # Fallback: default to support
-            return OrchestratorDecision(
-                intent="support",
-                confidence=0.5,
-                reasoning=f"classification failed: {exc}; defaulting to support",
-                context_for_agent={"customer_id": inp.customer_id, "session_id": inp.session_id, "channel": inp.channel, **(inp.context or {})},
-            )
+        return {
+            "intent": intent,
+            # A model that reports 1.4 or -0.2 is not telling us anything
+            # useful; clamp rather than propagate a nonsense number.
+            "confidence": round(min(max(confidence, 0.0), 1.0), 3),
+            "reasoning": str(data.get("reasoning", "")),
+        }
 
 
-def handler(event: dict, context: object) -> dict:
-    """Step Function entry point."""
-    from src.common import JobContext
-    ctx = JobContext(
-        session_id=event.get("session_id", "unknown"),
-        customer_id=event.get("customer_id"),
-        environment=os.environ.get("ENVIRONMENT", "dev"),
-    )
-    inp = ConversationRequest.from_dict(event) if isinstance(event, dict) else event
-    orch = Orchestrator()
-    result = orch.handle(ctx, inp)
-    return result.to_dict()
+def _run(data: dict[str, Any]) -> dict[str, Any]:
+    decision = Orchestrator().run(data["transcript"])
+    decision["context_for_agent"] = {
+        "customer_id": data.get("customer_id"),
+        "session_id": data.get("session_id"),
+        "channel": data.get("channel", "web"),
+        **(data.get("context") or {}),
+    }
+    return decision
+
+
+def handler(event: dict[str, Any], context: object) -> dict[str, Any]:
+    try:
+        return run_stage(event, required=["transcript"], fn=_run)
+    except ModelError as exc:
+        # Routing failed. Rather than guessing, say so: a message sent to the
+        # wrong agent produces a confidently wrong answer, which is worse
+        # than asking the customer to rephrase.
+        return respond(502, {"error": "ROUTING_FAILED", "message": str(exc)})

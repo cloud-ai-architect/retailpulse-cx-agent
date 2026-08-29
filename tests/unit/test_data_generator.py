@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import json
-
 from data_curator.generate import (
     generate_catalog,
     generate_customers,
     generate_orders,
-    make_product,
     make_customer,
-    make_order,
+    make_product,
 )
 
 

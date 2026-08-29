@@ -11,9 +11,10 @@
 
 **Please do NOT file a public GitHub issue for security vulnerabilities.**
 
-Report privately via GitHub Security Advisories: https://github.com/cloud-ai-architect/retailpulse-cx-agent/security/advisories/new
+Report privately via GitHub Security Advisories: <https://github.com/cloud-ai-architect/retailpulse-cx-agent/security/advisories/new>
 
 Please include:
+
 - Description of the vulnerability and its impact
 - Steps to reproduce or a proof-of-concept
 - Affected component(s) and version(s)

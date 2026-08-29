@@ -51,6 +51,7 @@ For a portfolio-quality demo that shows "real" agent behavior, option 3 is the m
 **Chosen option 1: `browser-use` library**, deployed as a separate AWS Fargate task (not Lambda, because the Chromium binary exceeds Lambda's 250MB deployment limit).
 
 Pattern:
+
 - CrewAI Sales agent exposes a `compare_price(product_name: str) -> PriceComparison` tool
 - Tool implementation: invoke browser-use in a Fargate task via ECS Run Task API
 - Fargate pulls product name, navigates Amazon/Walmart/Target, extracts prices

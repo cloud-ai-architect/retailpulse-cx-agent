@@ -6,15 +6,15 @@ terraform {
 }
 
 variable "bucket_name" {
-   type = string
- }
+  type = string
+}
 variable "common_tags" {
   type = map(string)
   default = {
-}
+  }
 }
 variable "allow_public" {
-  type = bool
+  type    = bool
   default = false
 }
 resource "aws_s3_bucket" "this" {
@@ -59,8 +59,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
 }
 
 output "bucket_arn" {
-   value = aws_s3_bucket.this.arn
- }
+  value = aws_s3_bucket.this.arn
+}
 output "bucket_name" {
   value = aws_s3_bucket.this.bucket
 }

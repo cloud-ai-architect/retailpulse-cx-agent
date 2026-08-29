@@ -1,27 +1,28 @@
 terraform {
   required_version = ">= 1.9.0"
   required_providers {
-    aws    = { source = "hashicorp/aws",    version = "~> 5.50" }
+    aws    = { source = "hashicorp/aws", version = "~> 5.50" }
     random = { source = "hashicorp/random", version = "~> 3.6" }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
   }
 }
 
 variable "bucket_name" {
-   type = string
- }
+  type = string
+}
 variable "index_name" {
   type = string
 }
 variable "embedding_dim" {
-  type = number
+  type    = number
   default = 1024
 }
 variable "common_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
-}
-variable "vectors_role_arn" {
-  type = string
 }
 resource "aws_kms_key" "this" {
   description             = "KMS key for ${var.bucket_name}"
@@ -40,8 +41,18 @@ resource "aws_s3_bucket" "this" {
   tags   = var.common_tags
 }
 
-resource "aws_s3_bucket_public_access_block" "this" {
+# Embeddings are derived data and can be regenerated, but a bad ingestion
+# run that overwrites good vectors is otherwise unrecoverable, and
+# regenerating means paying to embed the whole corpus again.
+resource "aws_s3_bucket_versioning" "this" {
   bucket = aws_s3_bucket.this.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "this" {
+  bucket                  = aws_s3_bucket.this.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -82,22 +93,22 @@ EOF
   }
 }
 
-output "bucket_arn"    {
-   value = aws_s3_bucket.this.arn
- }
-output "bucket_name"   {
+output "bucket_arn" {
+  value = aws_s3_bucket.this.arn
+}
+output "bucket_name" {
   value = aws_s3_bucket.this.bucket
 }
 output "vector_bucket" {
   value = var.bucket_name
 }
-output "index_arn"     {
+output "index_arn" {
   value = "arn:aws:s3vectors:ap-south-1:${data.aws_caller_identity.current.account_id}:vector-bucket/${var.bucket_name}/index/${var.index_name}"
 }
-output "index_name"    {
+output "index_name" {
   value = var.index_name
 }
-output "kms_key_arn"   {
+output "kms_key_arn" {
   value = aws_kms_key.this.arn
 }
 data "aws_caller_identity" "current" {}

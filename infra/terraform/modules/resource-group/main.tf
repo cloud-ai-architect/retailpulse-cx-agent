@@ -6,13 +6,13 @@ terraform {
 }
 
 variable "name_prefix" {
-   type = string
- }
+  type = string
+}
 variable "environment" {
   type = string
 }
 variable "common_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 resource "aws_resourcegroups_group" "this" {
@@ -32,9 +32,9 @@ resource "aws_resourcegroups_group" "this" {
   tags = var.common_tags
 }
 
-output "arn"  {
-   value = aws_resourcegroups_group.this.arn
- }
+output "arn" {
+  value = aws_resourcegroups_group.this.arn
+}
 output "name" {
   value = aws_resourcegroups_group.this.name
 }

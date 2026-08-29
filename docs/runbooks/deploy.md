@@ -18,7 +18,7 @@ Step-by-step procedure to deploy RetailPulse to a new AWS account, or to redeplo
 ### Step 1: Clone the repo
 
 ```bash
-git clone https://github.com/cloud-ai-architect/retailpulse-cx-agent.git
+git clone <https://github.com/cloud-ai-architect/retailpulse-cx-agent.git>
 cd retailpulse-cx-agent
 ```
 
@@ -29,6 +29,7 @@ bash scripts/bootstrap.sh retailpulse dev ap-south-1
 ```
 
 This creates:
+
 - S3 bucket for Terraform state (versioned, encrypted, public-blocked)
 - DynamoDB table for state locking
 - GitHub OIDC provider
@@ -186,7 +187,7 @@ terraform apply -var-file=envs/staging.tfvars
 ### Bedrock "AccessDeniedException"
 
 - You need to enable model access in the Bedrock console first
-- Go to https://ap-south-1.console.aws.amazon.com/bedrock/home → Model access → Enable "Anthropic Claude Sonnet 4.5", "Cohere Embed v3", "Titan Text Embeddings v2"
+- Go to <https://ap-south-1.console.aws.amazon.com/bedrock/home> → Model access → Enable "Anthropic Claude Sonnet 4.5", "Cohere Embed v3", "Titan Text Embeddings v2"
 
 ### Step Function execution fails immediately
 

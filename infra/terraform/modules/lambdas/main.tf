@@ -1,34 +1,31 @@
 terraform {
   required_version = ">= 1.9.0"
   required_providers {
-    aws     = { source = "hashicorp/aws",     version = "~> 5.50" }
+    aws     = { source = "hashicorp/aws", version = "~> 5.50" }
     archive = { source = "hashicorp/archive", version = "~> 2.4" }
-    random  = { source = "hashicorp/random",  version = "~> 3.6" }
+    random  = { source = "hashicorp/random", version = "~> 3.6" }
   }
 }
 
 variable "project_name" {
-   type = string
- }
-variable "environment" {
   type = string
 }
-variable "name_prefix" {
+variable "environment" {
   type = string
 }
 variable "lambdas" {
   type = map(string)
 }
 variable "lambda_runtime" {
-  type = string
+  type    = string
   default = "python3.12"
 }
 variable "lambda_memory_mb" {
-  type = number
+  type    = number
   default = 512
 }
 variable "lambda_timeout" {
-  type = number
+  type    = number
   default = 300
 }
 variable "buckets" {
@@ -49,15 +46,12 @@ variable "haiku_model_id" {
 variable "lambda_role_arns" {
   type = map(string)
 }
-variable "api_role_arns" {
-  type = map(string)
-}
 variable "log_retention_days" {
-  type = number
+  type    = number
   default = 30
 }
 variable "common_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 locals {
@@ -69,7 +63,7 @@ locals {
     VECTOR_INDEX        = var.vector_index_name
     ORDERS_TABLE        = var.tables.orders
     FEEDBACK_TABLE      = var.tables.feedback
-    CONVERSATIONS_TABLE = var.tables.coversations
+    CONVERSATIONS_TABLE = var.tables.conversations
     BEDROCK_MODEL_ID    = var.bedrock_model_id
     HAIKU_MODEL_ID      = var.haiku_model_id
     LOG_LEVEL           = "INFO"
@@ -120,18 +114,26 @@ resource "aws_lambda_function" "this" {
   tracing_config {
     mode = "Active"
   }
+
+  # Terraform provisions the function; application code is delivered
+  # separately by the packaging step via update-function-code. Without this,
+  # every apply reverts the live code to the placeholder stub above -- a
+  # deploy that reports success and silently un-deploys the application.
+  lifecycle {
+    ignore_changes = [filename, source_code_hash]
+  }
 }
 
 resource "aws_cloudwatch_log_group" "this" {
-  for_each = var.lambdas
+  for_each          = var.lambdas
   name              = "/aws/lambda/${each.value}"
   retention_in_days = var.log_retention_days
   tags              = var.common_tags
 }
 
 output "function_arns" {
-   value = { for k, fn in aws_lambda_function.this : k => fn.arn }
- }
+  value = { for k, fn in aws_lambda_function.this : k => fn.arn }
+}
 output "function_names" {
   value = { for k, fn in aws_lambda_function.this : k => fn.function_name }
 }

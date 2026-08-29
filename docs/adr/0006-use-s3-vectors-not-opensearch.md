@@ -8,11 +8,13 @@
 ## Context and problem statement
 
 RetailPulse needs a vector store for embeddings of:
+
 - Product catalog (~10K-100K items for a mid-size retailer)
 - FAQ + return policies (~1K-5K docs)
 - Customer interaction memory
 
 Requirements:
+
 - p95 query latency < 200ms
 - Idle cost near zero (side-project economics)
 - Native AWS (ap-south-1)

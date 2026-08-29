@@ -33,4 +33,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependabot weekly updates
 - All resources tagged `Project=retailpulse` for IAM scoping
 
-[Unreleased]: https://github.com/cloud-ai-architect/retailpulse-cx-agent/compare/main...HEAD
+[Unreleased]: <https://github.com/cloud-ai-architect/retailpulse-cx-agent/compare/main...HEAD>

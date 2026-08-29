@@ -8,16 +8,11 @@ terraform {
 variable "arn" {
   type = string
 }
-variable "common_tags" {
-  type = map(string)
-  default = {}
-}
-
 # Use data source to read existing OIDC provider (created once at account bootstrap)
 data "aws_iam_openid_connect_provider" "github" {
   arn = var.arn
 }
 
 output "provider_arn" {
-   value = data.aws_iam_openid_connect_provider.github.arn
- }
+  value = data.aws_iam_openid_connect_provider.github.arn
+}

@@ -8,11 +8,13 @@
 ## Context and problem statement
 
 RetailPulse needs embeddings for:
+
 - RAG over the product catalog (so Sales can find similar items)
 - RAG over FAQ + return policies (for Support and Returns)
 - Long-term memory of customer interactions
 
 Requirements:
+
 - Available in `ap-south-1` (Mumbai, our target region)
 - Cost ≤ $0.10 per 1M tokens
 - 1024 dims or less (S3 Vectors sweet spot)

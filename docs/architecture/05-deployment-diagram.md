@@ -165,7 +165,8 @@ tags = {
 ```
 
 Resource Group `rg-retailpulse-dev` is filter-based:
-```
+
+```text
 TagFilters: Project=retailpulse AND Environment=dev
 ```
 

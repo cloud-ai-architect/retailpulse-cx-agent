@@ -1,82 +1,53 @@
-"""Sales agent — product discovery and price comparison.
-
-Uses CrewAI to coordinate two tools:
-- search_catalog: semantic search over the product catalog
-- compare_price: real-time price comparison via browser-use in Fargate
-"""
+"""Sales agent: product discovery and value questions."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from crewai import Agent, Crew, Process, Task
+from src.agent import BaseAgent
+from src.tools.catalog import TOOL as CATALOG_TOOL
+from src.tools.price_compare import TOOL as PRICE_TOOL
 
 
-SALES_AGENT = None  # lazy init
+class SalesAgent(BaseAgent):
+    NAME = "sales"
 
+    TOOLS = {
+        "search_catalog": CATALOG_TOOL,
+        "compare_price": PRICE_TOOL,
+    }
 
-def get_sales_agent() -> Agent:
-    """Lazy-init the Sales agent to avoid cold-start cost when not needed."""
-    global SALES_AGENT
-    if SALES_AGENT is None:
-        from src.tools.catalog import search_catalog_tool
-        from src.tools.price_compare import compare_price_tool
+    SYSTEM_PROMPT = """You are a retail sales associate. You help customers find \
+the right product and decide whether it is good value.
 
-        SALES_AGENT = Agent(
-            role="Retail Sales Associate",
-            goal=(
-                "Help customers find the right product at the right price. "
-                "Be specific about availability, sizing, and value. "
-                "Use the price comparison tool when customers ask about value or compare prices."
-            ),
-            backstory=(
-                "You are an experienced retail sales associate with deep knowledge of "
-                "apparel, electronics, home goods, and beauty products. You help customers "
-                "make confident buying decisions. You never oversell or pressure. "
-                "If a product is out of stock, you suggest alternatives."
-            ),
-            tools=[search_catalog_tool(), compare_price_tool()],
-            llm="bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-            allow_delegation=False,  # Sales doesn't delegate
-            verbose=False,
+Rules you do not break:
+
+- Never name a product, price, or stock status that did not come back from \
+search_catalog. If the catalog returns nothing, say you could not find it and \
+ask one clarifying question.
+- Only quote a competitor price from compare_price, and never when the result \
+is marked stale. If it is stale, say you cannot confirm competitor pricing \
+right now.
+- If something is out of stock, say so plainly and offer one or two \
+alternatives from the catalog.
+- Do not pressure, upsell, or invent urgency.
+
+Keep replies under about 60 words. These are often read aloud."""
+
+    def handle(self, customer_id: str, transcript: str, context: dict[str, Any]) -> str:
+        prompt = (
+            f"Customer id: {customer_id}\n"
+            f"They said: {transcript}\n"
+            f"What we already know: {context}\n\n"
+            "Help them."
         )
-    return SALES_AGENT
+        return self.converse(prompt)
 
 
-SALES_TASK_TEMPLATE = """You are a retail sales associate helping a customer with this request:
-
-Customer: {customer_id}
-Request: {transcript}
-Context: {context}
-
-Your job:
-1. Understand what the customer wants
-2. Search the catalog for matching products
-3. If they ask about value or compare prices, use the price comparison tool
-4. Recommend the best option with a clear reason
-5. Be concise — voice responses should be under 30 seconds
-
-If the product is out of stock, suggest 1-2 alternatives.
-If the request is unclear, ask one clarifying question.
-If the request is about something other than shopping (return, complaint), 
-politely redirect: "I'll connect you with our support team."
-
-Respond as if speaking directly to the customer. Be friendly and specific.
-"""
-
-
-def run_sales_agent(customer_id: str | None, transcript: str, context: dict[str, Any]) -> str:
-    """Run the Sales agent and return the response text."""
-    agent = get_sales_agent()
-    task = Task(
-        description=SALES_TASK_TEMPLATE.format(
-            customer_id=customer_id or "anonymous",
-            transcript=transcript,
-            context=context or {},
-        ),
-        expected_output="A concise response to the customer (under 200 words).",
-        agent=agent,
-    )
-    crew = Crew(agents=[agent], tasks=[task], process=Process.sequential, verbose=False)
-    result = crew.kickoff()
-    return str(result)
+def run_sales_agent(
+    customer_id: str, transcript: str, context: dict[str, Any] | None = None
+) -> tuple[str, list[dict[str, Any]]]:
+    """Run the sales agent and return its reply plus the tools it used."""
+    agent = SalesAgent()
+    reply = agent.run(customer_id, transcript, context or {})
+    return reply, agent.tool_calls

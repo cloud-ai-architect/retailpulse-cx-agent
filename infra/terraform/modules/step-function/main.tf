@@ -6,8 +6,8 @@ terraform {
 }
 
 variable "name_prefix" {
-   type = string
- }
+  type = string
+}
 variable "state_machine_arn" {
   type = string
 }
@@ -15,7 +15,7 @@ variable "lambda_arns" {
   type = map(string)
 }
 variable "common_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 locals {
@@ -31,22 +31,22 @@ locals {
           "Payload.$"    = "$"
         }
         Retry = [{
-          ErrorEquals    = ["States.TaskFailed"]
+          ErrorEquals     = ["States.TaskFailed"]
           IntervalSeconds = 1
-          MaxAttempts    = 3
-          BackoffRate    = 2.0
+          MaxAttempts     = 3
+          BackoffRate     = 2.0
         }]
         Catch = [{
           ErrorEquals = ["States.ALL"]
           ResultPath  = "$.error"
-          Next       = "Failed"
+          Next        = "Failed"
         }]
         Next = "Dispatch"
       }
       Dispatch = {
         Type = "Choice"
         Choices = [
-          { Variable = "$.intent", StringEquals = "sales",   Next = "SalesAgent" },
+          { Variable = "$.intent", StringEquals = "sales", Next = "SalesAgent" },
           { Variable = "$.intent", StringEquals = "support", Next = "SupportAgent" },
           { Variable = "$.intent", StringEquals = "returns", Next = "ReturnsAgent" }
         ]
@@ -60,15 +60,15 @@ locals {
           "Payload.$"    = "$"
         }
         Retry = [{
-          ErrorEquals    = ["States.TaskFailed"]
+          ErrorEquals     = ["States.TaskFailed"]
           IntervalSeconds = 1
-          MaxAttempts    = 3
-          BackoffRate    = 2.0
+          MaxAttempts     = 3
+          BackoffRate     = 2.0
         }]
         Catch = [{
           ErrorEquals = ["States.ALL"]
           ResultPath  = "$.error"
-          Next       = "Failed"
+          Next        = "Failed"
         }]
         End = true
       }
@@ -80,15 +80,15 @@ locals {
           "Payload.$"    = "$"
         }
         Retry = [{
-          ErrorEquals    = ["States.TaskFailed"]
+          ErrorEquals     = ["States.TaskFailed"]
           IntervalSeconds = 1
-          MaxAttempts    = 3
-          BackoffRate    = 2.0
+          MaxAttempts     = 3
+          BackoffRate     = 2.0
         }]
         Catch = [{
           ErrorEquals = ["States.ALL"]
           ResultPath  = "$.error"
-          Next       = "Failed"
+          Next        = "Failed"
         }]
         End = true
       }
@@ -100,15 +100,15 @@ locals {
           "Payload.$"    = "$"
         }
         Retry = [{
-          ErrorEquals    = ["States.TaskFailed"]
+          ErrorEquals     = ["States.TaskFailed"]
           IntervalSeconds = 1
-          MaxAttempts    = 3
-          BackoffRate    = 2.0
+          MaxAttempts     = 3
+          BackoffRate     = 2.0
         }]
         Catch = [{
           ErrorEquals = ["States.ALL"]
           ResultPath  = "$.error"
-          Next       = "Failed"
+          Next        = "Failed"
         }]
         End = true
       }
@@ -137,8 +137,8 @@ resource "aws_sfn_state_machine" "this" {
 }
 
 output "state_machine_arn" {
-   value = aws_sfn_state_machine.this.arn
- }
+  value = aws_sfn_state_machine.this.arn
+}
 output "state_machine_name" {
   value = aws_sfn_state_machine.this.name
 }

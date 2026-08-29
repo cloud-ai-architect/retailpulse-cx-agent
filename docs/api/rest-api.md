@@ -18,7 +18,7 @@ from botocore.awsrequest import AWSRequest
 
 session = boto3.Session()
 credentials = session.get_credentials()
-api_url = "https://abc123.execute-api.ap-south-1.amazonaws.com"
+api_url = "<https://abc123.execute-api.ap-south-1.amazonaws.com">
 
 def signed_post(path, body=None):
     url = f"{api_url}{path}"
@@ -57,7 +57,7 @@ Send a message to the agent team. Returns the agent's response.
   "intent": "returns",
   "agent": "returns",
   "response": "I can help you with that. Which order would you like to return?",
-  "audio_url": "https://...polly-output.mp3",
+  "audio_url": "<https://...polly-output.mp3",>
   "tool_calls": [
     {"tool": "lookup_order", "args": {...}, "result": {...}}
   ],
@@ -66,12 +66,13 @@ Send a message to the agent team. Returns the agent's response.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: AWS4-HMAC-SHA256 ..." \
   -d '{"transcript":"I want to return my order #12345"}' \
-  https://abc123.execute-api.ap-south-1.amazonaws.com/v1/conversations
+  <https://abc123.execute-api.ap-south-1.amazonaws.com/v1/conversations>
 ```
 
 **Errors**:
@@ -89,9 +90,11 @@ curl -X POST \
 Retrieve a past conversation by session ID.
 
 **Path parameters**:
+
 - `id` (string, required) — session ID
 
 **Response**:
+
 ```json
 {
   "session_id": "abc-123",
@@ -111,6 +114,7 @@ Retrieve a past conversation by session ID.
 Search the product catalog semantically.
 
 **Query parameters**:
+
 - `q` (string, required) — search query
 - `top_k` (int, default 10, max 100)
 - `min_price` (decimal, optional)
@@ -118,6 +122,7 @@ Search the product catalog semantically.
 - `category` (string, optional)
 
 **Response**:
+
 ```json
 {
   "query": "blue oxford shirt",
@@ -138,9 +143,11 @@ Search the product catalog semantically.
 Initiate a refund for an order.
 
 **Path parameters**:
+
 - `id` (string, required) — order ID
 
 **Request body**:
+
 ```json
 {
   "reason": "Defective product",
@@ -149,6 +156,7 @@ Initiate a refund for an order.
 ```
 
 **Response**:
+
 ```json
 {
   "refund_id": "RF-uuid",

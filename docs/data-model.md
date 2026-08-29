@@ -212,6 +212,7 @@ graph LR
 ```
 
 Every chunk can be traced back to:
+
 - The source object (S3 catalog, FAQ, policy)
 - The model version that processed it
 - The conversation that used it (if applicable)

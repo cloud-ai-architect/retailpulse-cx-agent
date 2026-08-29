@@ -151,7 +151,7 @@ sequenceDiagram
 
 ### S3 catalog bucket
 
-```
+```text
 s3://retailpulse-dev-catalog/
 ├── master.json              # Full product list (master)
 ├── categories/              # Category-specific files
@@ -165,7 +165,7 @@ s3://retailpulse-dev-catalog/
 
 ### DynamoDB tables
 
-```
+```text
 retailpulse-dev-orders
   PK: customer_id
   SK: order_id
@@ -184,7 +184,7 @@ retailpulse-dev-conversations
 
 ### S3 Vectors index
 
-```
+```text
 index: retailpulse-chunks-v1
 dimensions: 1024
 distance: cosine

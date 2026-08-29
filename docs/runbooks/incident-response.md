@@ -4,6 +4,17 @@
 
 When something is broken **right now** and the agent is down, the API is returning 500s, or Bedrock is rejecting requests, this is the runbook. It prioritizes **fast detection, fast mitigation, post-mortem later**.
 
+## Before you start
+
+The commands below use `$ACCOUNT_ID` rather than a literal account number, so
+this runbook can be read and copied without publishing which account it
+operates on. Resolve it once at the start of an incident:
+
+```bash
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_REGION=ap-south-1
+```
+
 ## Severity levels
 
 | Level | Impact | Response time | Examples |
@@ -42,10 +53,11 @@ flowchart TD
 **Symptom**: Step Function execution status `FAILED`, error in `Orchestrator` state.
 
 **Diagnostic**:
+
 ```bash
 # Get the failed execution
 aws stepfunctions list-executions \
-  --state-machine-arn arn:aws:states:ap-south-1:761554981898:stateMachine:retailpulse-dev-pipeline \
+  --state-machine-arn arn:aws:states:ap-south-1:$ACCOUNT_ID:stateMachine:retailpulse-dev-pipeline \
   --status-filter FAILED \
   --max-items 1 \
   --region ap-south-1
@@ -73,6 +85,7 @@ aws logs tail /aws/lambda/retailpulse-dev-orchestrator --follow --region ap-sout
 **Symptom**: Step Function succeeds, but no audio returned to customer.
 
 **Diagnostic**:
+
 ```bash
 aws logs tail /aws/lambda/retailpulse-dev-polly --follow --region ap-south-1
 ```
@@ -90,6 +103,7 @@ aws logs tail /aws/lambda/retailpulse-dev-polly --follow --region ap-south-1
 **Symptom**: Customer audio not converted to text.
 
 **Diagnostic**:
+
 ```bash
 aws logs tail /aws/lambda/retailpulse-dev-transcribe --follow --region ap-south-1
 ```
@@ -107,6 +121,7 @@ aws logs tail /aws/lambda/retailpulse-dev-transcribe --follow --region ap-south-
 **Symptom**: `compare_price` tool returns error.
 
 **Diagnostic**:
+
 ```bash
 aws logs tail /aws/lambda/retailpulse-dev-sales --follow --region ap-south-1
 ```
@@ -124,6 +139,7 @@ aws logs tail /aws/lambda/retailpulse-dev-sales --follow --region ap-south-1
 **Symptom**: HTTP 500 from `/v1/conversations`.
 
 **Diagnostic**:
+
 ```bash
 aws logs tail /aws/vendedlogs/apigateway/retailpulse-dev-api --follow --region ap-south-1
 ```
@@ -141,6 +157,7 @@ aws logs tail /aws/vendedlogs/apigateway/retailpulse-dev-api --follow --region a
 **Symptom**: Browser shows 403, 502, or 504.
 
 **Diagnostic**:
+
 ```bash
 aws cloudfront get-distribution --id <distribution-id>
 
@@ -170,6 +187,7 @@ aws cloudwatch get-metric-statistics \
 **Symptom**: Apply workflow fails with AWS error.
 
 **Diagnostic**:
+
 - Check the Actions tab for the failed run
 - Look at the `terraform apply` step output
 - Most common: `sts:AssumeRoleWithWebIdentity` fails
@@ -205,7 +223,7 @@ Within 48 hours of resolution:
 ```bash
 # Find all failed executions in the last hour
 aws stepfunctions list-executions \
-  --state-machine-arn arn:aws:states:ap-south-1:761554981898:stateMachine:retailpulse-dev-pipeline \
+  --state-machine-arn arn:aws:states:ap-south-1:$ACCOUNT_ID:stateMachine:retailpulse-dev-pipeline \
   --status-filter FAILED \
   --region ap-south-1 \
   --query "executions[?startDate>=\`$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)\`]"

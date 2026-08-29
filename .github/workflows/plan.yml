@@ -17,7 +17,18 @@ jobs:
   plan:
     name: Plan (dev)
     runs-on: ubuntu-latest
-    environment: dev
+    if: github.actor != 'dependabot[bot]'
+    # No `environment:` here, deliberately.
+    #
+    # Declaring a GitHub Environment changes the OIDC subject from
+    # repo:ORG/REPO:ref:refs/heads/main to repo:ORG/REPO:environment:dev.
+    # The deploy role's trust policy allows the ref form, so with an
+    # environment declared every run failed at credential load with
+    # "Could not load credentials from any providers" -- which reads like a
+    # missing secret rather than a subject mismatch, and cost a while to find.
+    #
+    # Either add the environment subject to the trust policy or do not
+    # declare one. The rest of this portfolio does not, so neither does this.
     steps:
       - uses: actions/checkout@v4
 

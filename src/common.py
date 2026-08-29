@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import functools
 import time
-import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
-from typing import Any, ClassVar, Literal, get_args, get_origin
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, get_args, get_origin
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import boto3
 import structlog
@@ -98,9 +99,7 @@ def _check_types(obj: Any) -> None:
         if get_origin(annotation) is Literal:
             allowed = get_args(annotation)
             if value not in allowed:
-                raise TypeError(
-                    f"Field {f.name}: {value!r} not in {allowed}"
-                )
+                raise TypeError(f"Field {f.name}: {value!r} not in {allowed}")
         if is_dataclass(value):
             _check_types(value)
         elif isinstance(value, list) and value and is_dataclass(value[0]):
@@ -124,7 +123,7 @@ class DataCuratorModel:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DataCuratorModel":
+    def from_dict(cls, data: dict[str, Any]) -> DataCuratorModel:
         if not isinstance(data, dict):
             raise TypeError(f"from_dict requires a dict, got {type(data).__name__}")
         known = {f.name for f in fields(cls)}
@@ -141,17 +140,21 @@ class DataCuratorModel:
                     ann_name = annotation
                 else:
                     ann_name = getattr(annotation, "__name__", str(annotation))
+                # is_dataclass() narrows to DataclassInstance, which has no
+                # from_dict. Every dataclass reachable here is a
+                # DataCuratorModel subclass, which does -- the checks below
+                # establish that, but the type system cannot see it.
                 nested = globals().get(ann_name) or _resolve_typing(annotation)
-                if nested is not None and is_dataclass(nested) and isinstance(value, dict):
-                    value = nested.from_dict(value)
-                elif (
-                    nested is not None
-                    and is_dataclass(nested)
-                    and isinstance(value, list)
-                    and value
-                    and isinstance(value[0], dict)
-                ):
-                    value = [nested.from_dict(v) for v in value]
+                if nested is not None and is_dataclass(nested):
+                    # is_dataclass() narrows to DataclassInstance, which has
+                    # no from_dict. Every dataclass reachable here is a
+                    # DataCuratorModel subclass, which does; the cast names
+                    # what the branch above has already established.
+                    model = cast("type[DataCuratorModel]", nested)
+                    if isinstance(value, dict):
+                        value = model.from_dict(value)
+                    elif isinstance(value, list) and value and isinstance(value[0], dict):
+                        value = [model.from_dict(v) for v in value]
             kwargs[key] = value
         return cls(**kwargs)
 
@@ -223,16 +226,6 @@ class AgentResponse(DataCuratorModel):
 # --- CrewAI agent definitions ---
 
 
-# Lazy import: crewai might not be installed locally
-def get_crewai():
-    """Lazy import of crewai to keep cold start fast."""
-    try:
-        from crewai import Agent, Crew, Process, Task
-        return Agent, Crew, Process, Task
-    except ImportError as exc:
-        raise AgentError(f"crewai not installed: {exc}") from exc
-
-
 # --- Base Lambda ---
 
 
@@ -255,22 +248,36 @@ class BaseLambda(ABC):
         self.polly: Any = None
         self._setup_done = False
 
-    def setup(self) -> None:
-        pass
+    def setup(self) -> None:  # noqa: B027
+        """Optional per-handler initialisation.
+
+        Deliberately concrete and empty rather than abstract: most handlers
+        need nothing beyond the shared clients, and forcing every subclass to
+        write an empty override would be noise.
+        """
 
     def ensure_setup(self) -> None:
+        """Build the clients this handler needs, once per warm container.
+
+        Only S3, DynamoDB and Bedrock are created here. The base class used to
+        open six clients including Transcribe and Polly, which nothing in this
+        repo calls -- every cold start paid to construct them. A handler that
+        needs another service builds it in its own setup().
+
+        The region comes from the runtime rather than a literal, so the same
+        code deploys to a second region without an edit.
+        """
         if not self._setup_done:
             self.s3 = boto3.client("s3")
             self.dynamodb = boto3.client("dynamodb")
-            self.bedrock = boto3.client("bedrock-runtime", region_name="ap-south-1")
-            self.s3vectors = boto3.client("s3vectors", region_name="ap-south-1")
-            self.transcribe = boto3.client("transcribe", region_name="ap-south-1")
-            self.polly = boto3.client("polly", region_name="ap-south-1")
+            self.bedrock = boto3.client("bedrock-runtime")
             self.setup()
             self._setup_done = True
 
     @abstractmethod
-    def handle(self, ctx: JobContext, inp: DataCuratorModel) -> DataCuratorModel | list[DataCuratorModel]:
+    def handle(
+        self, ctx: JobContext, inp: DataCuratorModel
+    ) -> DataCuratorModel | list[DataCuratorModel]:
         pass
 
 
@@ -300,15 +307,20 @@ def stage(
                     if isinstance(inp, dict):
                         inp = input_model.from_dict(inp)
                     else:
-                        inp = input_model.from_dict(inp.to_dict() if hasattr(inp, "to_dict") else inp.__dict__)
+                        inp = input_model.from_dict(
+                            inp.to_dict() if hasattr(inp, "to_dict") else inp.__dict__
+                        )
 
                 result = original_handle(self, ctx, inp)
 
                 if isinstance(result, list):
                     if output_model is not None:
                         result = [
-                            r if isinstance(r, output_model)
-                            else output_model.from_dict(r.to_dict() if hasattr(r, "to_dict") else r)
+                            r
+                            if isinstance(r, output_model)
+                            else output_model.from_dict(
+                                r.to_dict() if isinstance(r, DataCuratorModel) else r
+                            )
                             for r in result
                         ]
                 elif output_model is not None and not isinstance(result, output_model):
@@ -326,7 +338,7 @@ def stage(
                 return result
             except Exception as exc:
                 duration_ms = int((time.perf_counter() - start) * 1000)
-                self.log.error(
+                self.log.exception(
                     "stage.error",
                     job_id=ctx.session_id,
                     error_type=type(exc).__name__,
@@ -356,6 +368,5 @@ __all__ = [
     "ToolCall",
     "ToolError",
     "VoiceError",
-    "get_crewai",
     "stage",
 ]

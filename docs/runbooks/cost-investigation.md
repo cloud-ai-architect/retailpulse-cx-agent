@@ -8,7 +8,7 @@ Step-by-step procedure to investigate a cost spike or unexpected charge. Use thi
 
 ```bash
 # 1. Check Cost Explorer for the current month
-# Open: https://console.aws.amazon.com/cost-management/home
+# Open: <https://console.aws.amazon.com/cost-management/home>
 
 # 2. Check if any budget alarms fired
 aws budgets describe-budgets --account-id $(aws sts get-caller-identity --query Account --output text)
@@ -29,6 +29,7 @@ aws ce get-cost-and-usage \
 **Symptom**: Bedrock line item dominates the bill.
 
 **Diagnostic**:
+
 ```bash
 # Check Bedrock usage in Cost Explorer
 aws ce get-cost-and-usage \
@@ -49,6 +50,7 @@ aws ce get-cost-and-usage \
 | Concurrent users | Add Lambda concurrency limit |
 
 **Fix**:
+
 ```bash
 # Throttle the Lambda concurrency
 aws lambda put-function-concurrency \
@@ -62,6 +64,7 @@ aws lambda put-function-concurrency \
 **Symptom**: Lambda bill spikes; thousands of invocations.
 
 **Diagnostic**:
+
 ```bash
 # Get Lambda invocation metrics for last 24h
 aws cloudwatch get-metric-statistics \
@@ -88,6 +91,7 @@ aws cloudwatch get-metric-statistics \
 **Symptom**: Fargate bill increases.
 
 **Diagnostic**:
+
 ```bash
 # Check Fargate usage
 aws ce get-cost-and-usage \
@@ -110,6 +114,7 @@ aws ce get-cost-and-usage \
 **Symptom**: DynamoDB line item high.
 
 **Diagnostic**:
+
 ```bash
 # Check consumed WCU/RCU
 aws cloudwatch get-metric-statistics \
@@ -135,6 +140,7 @@ aws cloudwatch get-metric-statistics \
 **Symptom**: CloudWatch Logs line item higher than expected.
 
 **Diagnostic**:
+
 ```bash
 # Find log groups by size
 aws logs describe-log-groups \
@@ -155,6 +161,7 @@ aws logs describe-log-groups \
 **Symptom**: Voice line item is high.
 
 **Diagnostic**:
+
 ```bash
 # Check voice usage
 aws ce get-cost-and-usage \

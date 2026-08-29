@@ -1,82 +1,160 @@
-"""Catalog tool — semantic search over the product catalog.
+"""Catalog tool: semantic search over the product catalog.
 
-Reads the catalog from S3, embeds the query with Titan v2,
-and does a similarity search via S3 Vectors.
+The catalog is small enough to hold in memory for the life of a warm Lambda,
+so search runs locally over cached embeddings rather than through a vector
+store. At a few thousand products that is faster than a network round trip
+and costs nothing to keep.
+
+If the catalog outgrows that, the swap is to S3 Vectors: the tool contract
+below does not change.
 """
 
 from __future__ import annotations
 
 import json
+import math
+import os
 from functools import lru_cache
 from typing import Any
 
-from crewai_tools import tool
+CATALOG_BUCKET = os.environ.get("CATALOG_BUCKET", "")
+CATALOG_KEY = os.environ.get("CATALOG_KEY", "catalog/master.json")
+EMBED_MODEL = os.environ.get("EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
+EMBED_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1024"))
+
+SPEC: dict[str, Any] = {
+    "name": "search_catalog",
+    "description": (
+        "Search the product catalog for items matching a customer's description. "
+        "Returns name, price in INR, category, sizes and stock status. Use this "
+        "before recommending anything, so that recommendations are real products "
+        "at real prices."
+    ),
+    "inputSchema": {
+        "json": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "What the customer is looking for, in their own words.",
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "How many products to return. Defaults to 5.",
+                },
+            },
+            "required": ["query"],
+        }
+    },
+}
 
 
 @lru_cache(maxsize=1)
-def _load_catalog() -> list[dict[str, Any]]:
-    """Load the catalog from S3 (cached for the Lambda's lifetime)."""
+def _load_catalog() -> tuple[dict[str, Any], ...]:
+    """Load the catalog once per warm Lambda.
+
+    Returns a tuple so the lru_cache entry cannot be mutated by a caller and
+    silently corrupt every later request on the same container.
+    """
+    if not CATALOG_BUCKET:
+        return ()
     import boto3
-    s3 = boto3.client("s3", region_name="ap-south-1")
-    bucket = "retailpulse-dev-catalog"
-    key = "master.json"
+
+    s3 = boto3.client("s3")
     try:
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        return json.loads(obj["Body"].read().decode("utf-8"))
+        obj = s3.get_object(Bucket=CATALOG_BUCKET, Key=CATALOG_KEY)
+        products = json.loads(obj["Body"].read().decode("utf-8"))
     except Exception:
-        return []
+        # An unreachable catalog is reported to the model as an empty result,
+        # not raised: the agent can still answer policy or order questions.
+        return ()
+    return tuple(products) if isinstance(products, list) else ()
 
 
-def _embed_query(query: str) -> list[float]:
-    """Embed a query with Bedrock Titan v2."""
+def _embed(text: str) -> list[float]:
     import boto3
-    bedrock = boto3.client("bedrock-runtime", region_name="ap-south-1")
+
+    bedrock = boto3.client("bedrock-runtime")
     response = bedrock.invoke_model(
-        modelId="amazon.titan-embed-text-v2:0",
+        modelId=EMBED_MODEL,
         contentType="application/json",
         accept="application/json",
-        body=json.dumps({
-            "inputText": query,
-            "dimensions": 1024,
-            "normalize": True,
-        }),
+        body=json.dumps({"inputText": text, "dimensions": EMBED_DIMENSIONS}),
     )
-    return json.loads(response["body"].read())["embedding"]
+    embedding: list[float] = json.loads(response["body"].read())["embedding"]
+    return embedding
 
 
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    """Cosine similarity between two vectors."""
-    dot = sum(x * y for x, y in zip(a, b))
-    na = sum(x * x for x in a) ** 0.5
-    nb = sum(x * x for x in b) ** 0.5
-    if na == 0 or nb == 0:
+def _cosine(a: list[float], b: list[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0.0 or nb == 0.0:
         return 0.0
     return dot / (na * nb)
 
 
-@tool("Search Catalog")
-def search_catalog_tool(query: str, max_results: int = 5) -> str:
-    """Search the product catalog for items matching the query.
+# Words this short ("a", "of", "to") match everything and rank nothing.
+_MIN_TERM_LENGTH = 2
 
-    Use this when the customer asks about products, categories, or availability.
-    Returns a JSON list of matching products with SKU, name, price, and stock.
+
+def _keyword_score(query: str, product: dict[str, Any]) -> float:
+    """Fallback ranking when a product carries no stored embedding.
+
+    Deliberately crude -- overlapping words over query length. It exists so
+    that a catalog which has not been through the embedding pipeline still
+    returns something sensible instead of nothing.
     """
-    catalog = _load_catalog()
-    if not catalog:
-        return json.dumps({"error": "Catalog unavailable", "results": []})
-
-    # For now, do a simple text-match since we don't have product embeddings yet
-    # In Phase 2, replace with semantic search using Titan v2 + S3 Vectors
-    q = query.lower()
-    matches = []
-    for item in catalog:
-        text = f"{item.get('name', '')} {item.get('description', '')} {item.get('category', '')} {item.get('brand', '')}".lower()
-        if any(word in text for word in q.split() if len(word) > 2):
-            matches.append(item)
-    matches = matches[:max_results]
-    return json.dumps({"query": query, "count": len(matches), "results": matches})
+    terms = {t for t in query.lower().split() if len(t) > _MIN_TERM_LENGTH}
+    if not terms:
+        return 0.0
+    haystack = " ".join(
+        str(product.get(f, "")) for f in ("name", "description", "category", "brand")
+    ).lower()
+    return sum(1 for t in terms if t in haystack) / len(terms)
 
 
-# Eager-loaded agent-bound tool for CrewAI
-def search_catalog_tool_bound():
-    return search_catalog_tool
+def search_catalog(query: str, top_k: int = 5) -> str:
+    """Rank the catalog against a query and return the best matches."""
+    products = _load_catalog()
+    if not products:
+        return json.dumps(
+            {"query": query, "count": 0, "results": [], "note": "catalog unavailable"}
+        )
+
+    top_k = max(1, min(int(top_k), 20))
+
+    embedded = [p for p in products if p.get("embedding")]
+    if embedded:
+        try:
+            q = _embed(query)
+            scored = [(_cosine(q, p["embedding"]), p) for p in embedded]
+        except Exception:
+            scored = [(_keyword_score(query, p), p) for p in products]
+    else:
+        scored = [(_keyword_score(query, p), p) for p in products]
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+
+    results = []
+    for score, p in scored[:top_k]:
+        if score <= 0.0:
+            continue
+        results.append(
+            {
+                "sku": p.get("sku"),
+                "name": p.get("name"),
+                "category": p.get("category"),
+                "price_inr": p.get("price_inr"),
+                "sizes": p.get("sizes"),
+                "in_stock": p.get("in_stock", True),
+                "score": round(float(score), 4),
+            }
+        )
+
+    return json.dumps({"query": query, "count": len(results), "results": results})
+
+
+TOOL = (SPEC, search_catalog)

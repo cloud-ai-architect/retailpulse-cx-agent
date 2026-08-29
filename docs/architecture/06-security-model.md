@@ -81,10 +81,12 @@ graph TB
 ```
 
 What this **allows**:
+
 - A push to `main` from a maintainer in this repo → role assumption
 - A PR opened from a maintainer in this repo → role assumption for plan
 
 What this **blocks**:
+
 - A fork attempting to assume the role (different `sub`)
 - A PR opened against a different branch (e.g., `feature/...`) by a maintainer
 - Any other repo in the org (different `sub`)
@@ -125,6 +127,7 @@ Each Lambda has a single-purpose role. Example for `retailpulse-sales-lambda`:
 ### IAM policy validation
 
 CI runs `tfsec` and `checkov` on every PR. Both flag:
+
 - Wildcard actions (`*:*`)
 - Wildcard resources (`*`)
 - Unused permissions
@@ -216,6 +219,7 @@ For the side-project scope, RetailPulse follows the AWS Well-Architected Framewo
 - ✅ Incident response (runbooks in `docs/runbooks/incident-response.md`)
 
 Not in scope (side-project, not enterprise):
+
 - ❌ SOC 2 audit
 - ❌ HIPAA / PCI-DSS compliance
 - ❌ Penetration testing

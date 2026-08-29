@@ -56,6 +56,7 @@ RetailPulse needs a voice channel. Customers will call in (or use a web voice wi
 **Chosen: Amazon Polly for TTS + Amazon Transcribe for STT** in Phase 1. **LiveKit evaluated for Phase 2** if real-time WebRTC is needed.
 
 Voice flow:
+
 1. Customer audio → Transcribe (Lambda) → text
 2. Text → CrewAI agents (orchestrator) → response text
 3. Response text → Polly (Lambda) → audio response

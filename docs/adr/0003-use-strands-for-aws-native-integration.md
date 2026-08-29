@@ -50,6 +50,7 @@ We need a secondary framework that's AWS-native but still uses standard Python a
 **Chosen option 1: Strands Agents** for AWS-specific tool implementations, used as a **tool provider inside CrewAI agents** (not as a competing orchestrator).
 
 Pattern:
+
 - Sales/Support/Returns agents are CrewAI `Agent` instances
 - Their `tools` list includes Strands-wrapped AWS tools (`S3GetObjectTool`, `DynamoDBQueryTool`, `BedrockConverseTool`)
 - CrewAI orchestrator decides which agent runs; the agent calls its tools; Strands handles the AWS API call

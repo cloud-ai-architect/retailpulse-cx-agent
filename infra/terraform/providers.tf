@@ -1,4 +1,4 @@
-﻿###############################################################################
+###############################################################################
 # DataCurator - Root Terraform Configuration
 ###############################################################################
 
@@ -21,9 +21,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "retailpulse-tfstate-dev"
-    key    = "retailpulse.tfstate"
-    region = "ap-south-1"
+    bucket  = "retailpulse-tfstate-dev"
+    key     = "retailpulse.tfstate"
+    region  = "ap-south-1"
     encrypt = true
   }
 }

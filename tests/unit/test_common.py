@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.common import (
     AgentError,
     AgentResponse,
     BaseLambda,
     CatalogError,
     ConversationRequest,
-    DataCuratorModel,
     IntentError,
     JobContext,
     OrchestratorDecision,
@@ -112,4 +109,4 @@ class TestStageDecorator:
                 )
 
         assert TestHandler.NAME == "test-stage"
-        assert TestHandler.OUTPUT_MODEL == AgentResponse
+        assert AgentResponse == TestHandler.OUTPUT_MODEL

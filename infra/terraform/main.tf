@@ -10,9 +10,9 @@ locals {
   }
 
   tables = {
-    orders       = "${local.name_prefix}-orders"
-    feedback     = "${local.name_prefix}-feedback"
-    coversations = "${local.name_prefix}-conversations"
+    orders        = "${local.name_prefix}-orders"
+    feedback      = "${local.name_prefix}-feedback"
+    conversations = "${local.name_prefix}-conversations"
   }
 
   lambdas = {
@@ -28,9 +28,8 @@ locals {
 # --- OIDC + IAM ---
 
 module "oidc" {
-  source      = "./modules/oidc"
-  arn         = local.github_oidc_arn
-  common_tags = local.common_tags
+  source = "./modules/oidc"
+  arn    = local.github_oidc_arn
 }
 
 module "iam" {
@@ -39,16 +38,12 @@ module "iam" {
   project_name      = var.project_name
   environment       = var.environment
   name_prefix       = local.name_prefix
-  github_org        = var.github_org
-  github_repo       = var.github_repo
   github_sub_main   = local.github_sub_main
   github_sub_pr     = local.github_sub_pr
   github_aud        = local.github_aud
-  github_thumbprint = local.github_thumbprint
   buckets           = local.buckets
   tables            = local.tables
   lambdas           = local.lambdas
-  vector_index_name = local.vector_index_name
   oidc_provider_arn = module.oidc.provider_arn
   common_tags       = local.common_tags
 }
@@ -66,19 +61,24 @@ module "catalog_bucket" {
 module "vectors_bucket" {
   source = "./modules/s3-vectors-bucket"
 
-  bucket_name      = local.buckets.vectors
-  index_name       = local.vector_index_name
-  embedding_dim    = var.embedding_dimensions
-  common_tags      = local.common_tags
-  vectors_role_arn = module.iam.vectors_role_arn
+  bucket_name   = local.buckets.vectors
+  index_name    = local.vector_index_name
+  embedding_dim = var.embedding_dimensions
+  common_tags   = local.common_tags
 }
 
 module "ui_bucket" {
   source = "./modules/s3-bucket"
 
-  bucket_name  = local.buckets.ui
-  common_tags  = local.common_tags
-  allow_public = true
+  bucket_name = local.buckets.ui
+  common_tags = local.common_tags
+
+  # Not public. CloudFront reads this bucket through its origin access
+  # control, and the bucket policy that grants it lives in the cloudfront
+  # module. A public-read bucket behind an OAC is the worst of both: the
+  # OAC signs requests nobody has to make, because the objects are already
+  # fetchable straight from S3.
+  allow_public = false
 }
 
 module "orders_dynamodb" {
@@ -98,7 +98,7 @@ module "feedback_dynamodb" {
 module "conversations_dynamodb" {
   source = "./modules/dynamodb-conversations"
 
-  table_name  = local.tables.coversations
+  table_name  = local.tables.conversations
   common_tags = local.common_tags
 }
 
@@ -109,7 +109,6 @@ module "lambdas" {
 
   project_name       = var.project_name
   environment        = var.environment
-  name_prefix        = local.name_prefix
   lambdas            = local.lambdas
   lambda_runtime     = var.lambda_runtime
   lambda_memory_mb   = var.lambda_memory_mb
@@ -120,7 +119,6 @@ module "lambdas" {
   bedrock_model_id   = var.bedrock_model_id
   haiku_model_id     = var.bedrock_haiku_model_id
   lambda_role_arns   = module.iam.lambda_role_arns
-  api_role_arns      = module.iam.api_role_arns
   log_retention_days = var.log_retention_days
   common_tags        = local.common_tags
 }
@@ -148,10 +146,23 @@ module "eventbridge" {
 module "apigateway" {
   source = "./modules/apigateway"
 
-  name_prefix     = local.name_prefix
-  search_lambda   = module.lambdas.function_arns["search"]
-  feedback_lambda = module.lambdas.function_arns["feedback"]
-  common_tags     = local.common_tags
+  name_prefix        = local.name_prefix
+  api_description    = "RetailPulse CX agent API"
+  log_retention_days = var.log_retention_days
+
+  # Every agent gets its own route. Previously only search and feedback were
+  # exposed, so the orchestrator and the three agents were unreachable -- the
+  # system could not be called at all.
+  routes = {
+    conversation = module.lambdas.function_arns["orchestrator"]
+    sales        = module.lambdas.function_arns["sales"]
+    support      = module.lambdas.function_arns["support"]
+    returns      = module.lambdas.function_arns["returns"]
+    search       = module.lambdas.function_arns["search"]
+    feedback     = module.lambdas.function_arns["feedback"]
+  }
+
+  common_tags = local.common_tags
 }
 
 module "cloudfront" {
@@ -159,7 +170,7 @@ module "cloudfront" {
 
   name_prefix = local.name_prefix
   ui_bucket   = local.buckets.ui
-  api_url     = module.apigateway.api_url
+  aws_region  = var.aws_region
   enabled     = var.enable_cloudfront
   common_tags = local.common_tags
 }

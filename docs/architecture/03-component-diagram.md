@@ -203,7 +203,7 @@ The OPA bundle is **embedded** in the Lambda deployment package.
 
 ## Where each component lives
 
-```
+```text
 retailpulse-cx-agent/
 ├── src/
 │   ├── common.py                 # BaseAgent, JobContext, @agent decorator

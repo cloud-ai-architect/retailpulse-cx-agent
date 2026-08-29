@@ -16,7 +16,7 @@ def transcribe_audio(audio_s3_uri: str, language: str = "en-IN") -> dict[str, An
     language: BCP-47 language code (en-IN, hi-IN, etc.)
     """
     transcribe = boto3.client("transcribe", region_name="ap-south-1")
-    bucket, key = audio_s3_uri.replace("s3://", "").split("/", 1)
+    bucket, _key = audio_s3_uri.replace("s3://", "").split("/", 1)
     job_name = f"retailpulse-{int(time.time())}"
 
     transcribe.start_transcription_job(
@@ -45,7 +45,9 @@ def transcribe_audio(audio_s3_uri: str, language: str = "en-IN") -> dict[str, An
     return {"transcript": data.get("results", {}).get("transcripts", [{}])[0].get("transcript", "")}
 
 
-def synthesize_speech(text: str, voice: str = "Kajal", output_s3_bucket: str = "retailpulse-dev-ui") -> str:
+def synthesize_speech(
+    text: str, voice: str = "Kajal", output_s3_bucket: str = "retailpulse-dev-ui"
+) -> str:
     """Synthesize speech with Polly and upload to S3.
 
     Returns: s3 URI of the audio file
@@ -60,7 +62,7 @@ def synthesize_speech(text: str, voice: str = "Kajal", output_s3_bucket: str = "
         Engine="neural",
     )
 
-    key = f"audio/{int(time.time())}-{hash(text) & 0xffffffff}.mp3"
+    key = f"audio/{int(time.time())}-{hash(text) & 0xFFFFFFFF}.mp3"
     s3.put_object(
         Bucket=output_s3_bucket,
         Key=key,

@@ -8,7 +8,7 @@ Generates:
 - Return policies
 
 Usage:
-    python data-curator/generate.py [--output-dir ./output] [--count 100]
+    python data_curator/generate.py [--output-dir ./output] [--count 100]
 """
 
 from __future__ import annotations

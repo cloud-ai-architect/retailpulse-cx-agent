@@ -22,6 +22,7 @@ What other approaches did you consider, and why is this one better?
 
 <!--
 If this is a non-trivial change, briefly describe:
+
 - Which subsystems are affected (agents, tools, voice, etc.)
 - Whether it changes existing data formats or APIs
 - Whether it requires new AWS services or IAM permissions

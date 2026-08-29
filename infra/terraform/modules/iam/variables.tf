@@ -1,16 +1,7 @@
 variable "project_name" {
   type = string
 }
-variable "environment" {
-  type = string
-}
 variable "name_prefix" {
-  type = string
-}
-variable "github_org" {
-  type = string
-}
-variable "github_repo" {
   type = string
 }
 variable "github_sub_main" {
@@ -22,9 +13,6 @@ variable "github_sub_pr" {
 variable "github_aud" {
   type = string
 }
-variable "github_thumbprint" {
-  type = string
-}
 variable "buckets" {
   type = map(string)
 }
@@ -34,14 +22,17 @@ variable "tables" {
 variable "lambdas" {
   type = map(string)
 }
-variable "vector_index_name" {
-  type = string
-}
 variable "oidc_provider_arn" {
   type = string
 }
 variable "common_tags" {
   type = map(string)
   default = {
+  }
 }
+
+# Used by the deploy policy to name the Terraform state bucket and lock
+# table, which are per-environment.
+variable "environment" {
+  type = string
 }

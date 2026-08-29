@@ -11,7 +11,7 @@ Static, serverless, single-page web app for searching the RetailPulse knowledge 
 
 ## Architecture
 
-```
+```text
 ui/
 ├── index.html      # Markup
 ├── style.css       # Styles (dark theme, GitHub-inspired)
@@ -35,7 +35,7 @@ For IAM-authenticated calls (production), the UI must use AWS SDK with SigV4 sig
 ```bash
 # Serve locally
 python -m http.server 8000 --directory ui
-# Open http://localhost:8000
+# Open <http://localhost:8000>
 ```
 
 ## Deployment

@@ -4,7 +4,6 @@
 
 locals {
   account_id  = data.aws_caller_identity.current.account_id
-  region      = coalesce(var.aws_region, data.aws_region.current.name)
   name_prefix = "${var.project_name}-${var.environment}"
 
   common_tags = {
@@ -15,15 +14,13 @@ locals {
     ManagedBy   = "terraform"
   }
 
-  github_sub_main   = "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main"
-  github_sub_pr     = "repo:${var.github_org}/${var.github_repo}:pull_request"
-  github_oidc_arn   = "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
-  github_aud        = "sts.amazonaws.com"
-  github_thumbprint = "6938fd4d98bab03faadb97b34396831e3780aea1"
+  github_sub_main = "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main"
+  github_sub_pr   = "repo:${var.github_org}/${var.github_repo}:pull_request"
+  github_oidc_arn = "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
+  github_aud      = "sts.amazonaws.com"
 
   vector_index_name = "${var.project_name}-chunks-v1"
 }
 
 data "aws_caller_identity" "current" {}
 
-data "aws_region" "current" {}

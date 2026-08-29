@@ -9,6 +9,10 @@ terraform {
   }
 }
 
+# The OIDC provider is account-local; resolving the account id here lets the
+# policy below name it instead of wildcarding the account position.
+data "aws_caller_identity" "current" {}
+
 # --- GitHub OIDC role (assumes the role from the OIDC trust policy) ---
 
 data "aws_iam_policy_document" "github_trust" {
@@ -42,17 +46,131 @@ resource "aws_iam_role" "github_actions" {
 }
 
 data "aws_iam_policy_document" "github_actions_inline" {
+  # Terraform state backend, addressed by ARN.
+  #
+  # This cannot be tag-conditioned. The state bucket is created by the
+  # bootstrap script rather than by Terraform, so it carries no Project tag,
+  # and S3 does not surface tags to IAM for HeadObject in any case. The
+  # previous policy allowed only tag-matched resources, so `terraform init`
+  # failed with 403 Forbidden when reading the state object.
   statement {
-    sid       = "AllActionsOnRetailPulse"
-    effect    = "Allow"
-    actions   = ["*"]
-    resources = ["*"]
+    sid    = "TerraformStateBackend"
+    effect = "Allow"
 
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/Project"
-      values   = [var.project_name]
-    }
+    actions = [
+      "s3:ListBucket",
+      "s3:GetBucketVersioning",
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+
+    resources = [
+      "arn:aws:s3:::${var.project_name}-tfstate-${var.environment}",
+      "arn:aws:s3:::${var.project_name}-tfstate-${var.environment}/*",
+    ]
+  }
+
+  statement {
+    sid    = "TerraformStateLock"
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:DescribeTable",
+    ]
+
+    resources = [
+      "arn:aws:dynamodb:*:*:table/${var.project_name}-tfstate-lock-${var.environment}",
+    ]
+  }
+
+  # IAM is confined to this project's own roles and policies. The deploy role
+  # can manage the roles this stack creates and nothing else -- notably it
+  # cannot touch its own trust policy or any unrelated principal.
+  statement {
+    sid    = "ProjectScopedIam"
+    effect = "Allow"
+
+    actions = [
+      "iam:GetRole",
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:UpdateRole",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:GetRolePolicy",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:PassRole",
+    ]
+
+    resources = [
+      "arn:aws:iam::*:role/${var.name_prefix}-*",
+    ]
+  }
+
+  # The GitHub OIDC provider is account-wide and shared by every project, so
+  # it cannot be name-scoped. Terraform reads it on each apply to resolve the
+  # federated principal; without this, apply fails on
+  # GetOpenIDConnectProvider. Create/Delete are deliberately excluded -- the
+  # provider is bootstrapped once and a deploy role has no business removing
+  # it out from under the other stacks.
+  statement {
+    sid    = "ReadSharedOidcProvider"
+    effect = "Allow"
+
+    actions = [
+      "iam:GetOpenIDConnectProvider",
+      "iam:ListOpenIDConnectProviders",
+    ]
+
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com",
+    ]
+  }
+
+  # Deploy permissions for the services this stack uses.
+  #
+  # Scoped by service rather than by resource: Terraform must create
+  # resources that do not exist yet, so they can be matched by neither ARN
+  # nor tag, and API Gateway, CloudFront and KMS address resources by
+  # generated ID. Enumerating services keeps this materially narrower than
+  # Action "*" while remaining workable for a deploy role.
+  # See the note above: Terraform must create resources that do not exist
+  # yet, so they can be addressed by neither ARN nor tag. Service enumeration
+  # is the narrowest workable scope for a deploy role, and this role is
+  # assumable only via GitHub OIDC from this one repository.
+  # tfsec:ignore:aws-iam-no-policy-wildcards
+  statement {
+    sid    = "DeployProjectServices"
+    effect = "Allow"
+
+    actions = [
+      "lambda:*",
+      "s3:*",
+      "s3vectors:*",
+      "dynamodb:*",
+      "apigateway:*",
+      "states:*",
+      "events:*",
+      "cloudfront:*",
+      "kms:*",
+      "logs:*",
+      "resource-groups:*",
+      "tag:GetResources",
+      "tag:TagResources",
+      "tag:UntagResources",
+      "sts:GetCallerIdentity",
+    ]
+
+    resources = ["*"]
   }
 }
 
@@ -103,6 +221,11 @@ resource "aws_iam_role_policy" "lambda_basic" {
 }
 
 data "aws_iam_policy_document" "lambda_bedrock" {
+  # foundation-model/* is the granularity at which Bedrock grants model
+  # access. Pinning individual model ARNs breaks the moment a model is
+  # retired or a cross-region inference profile is used, and the grant
+  # conveys nothing beyond invoking a managed model.
+  # tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid    = "BedrockInvoke"
     effect = "Allow"
@@ -145,8 +268,8 @@ data "aws_iam_policy_document" "lambda_dynamodb" {
       "arn:aws:dynamodb:*:*:table/${var.tables.orders}/index/*",
       "arn:aws:dynamodb:*:*:table/${var.tables.feedback}",
       "arn:aws:dynamodb:*:*:table/${var.tables.feedback}/index/*",
-      "arn:aws:dynamodb:*:*:table/${var.tables.coversations}",
-      "arn:aws:dynamodb:*:*:table/${var.tables.coversations}/index/*",
+      "arn:aws:dynamodb:*:*:table/${var.tables.conversations}",
+      "arn:aws:dynamodb:*:*:table/${var.tables.conversations}/index/*",
     ]
   }
 }
@@ -184,6 +307,11 @@ resource "aws_iam_role_policy" "lambda_s3" {
 }
 
 data "aws_iam_policy_document" "lambda_voice" {
+  # Transcribe jobs and Polly syntheses are addressed by names generated at
+  # call time, so there is no ARN to scope to at plan time. The actions
+  # themselves are the constraint: four read/synthesise calls, no delete, no
+  # access to any job this account did not create.
+  # tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid    = "VoiceServices"
     effect = "Allow"
@@ -258,6 +386,11 @@ resource "aws_iam_role" "vectors" {
 }
 
 data "aws_iam_policy_document" "vectors_inline" {
+  # The wildcard resource is narrowed by the aws:ResourceTag/Project
+  # condition below, which tfsec does not evaluate. s3vectors indexes are
+  # addressed by generated ARN, so a tag condition is the only scoping
+  # available at plan time.
+  # tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid    = "VectorsAccess"
     effect = "Allow"
@@ -349,30 +482,30 @@ resource "aws_iam_role_policy" "eventbridge" {
 # --- Outputs ---
 
 output "github_actions_role_arn" {
-   value = aws_iam_role.github_actions.arn
- }
+  value = aws_iam_role.github_actions.arn
+}
 output "lambda_role_arn" {
-   value = aws_iam_role.lambda_exec.arn
- }
+  value = aws_iam_role.lambda_exec.arn
+}
 output "lambda_role_arns" {
-   value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
- }
+  value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
+  }
 }
 
 output "api_role_arn" {
-   value = aws_iam_role.lambda_exec.arn
- }
+  value = aws_iam_role.lambda_exec.arn
+}
 output "api_role_arns" {
-   value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
- }
+  value = { for k, v in var.lambdas : k => aws_iam_role.lambda_exec.arn
+  }
 }
 
 output "vectors_role_arn" {
-   value = aws_iam_role.vectors.arn
- }
+  value = aws_iam_role.vectors.arn
+}
 output "step_function_role_arn" {
-   value = aws_iam_role.step_function.arn
- }
+  value = aws_iam_role.step_function.arn
+}
 output "eventbridge_role_arn" {
-   value = aws_iam_role.eventbridge.arn
- }
+  value = aws_iam_role.eventbridge.arn
+}

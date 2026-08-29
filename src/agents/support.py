@@ -1,77 +1,54 @@
-"""Support agent — customer questions, troubleshooting, FAQs.
-
-Uses CrewAI to coordinate:
-- lookup_order: fetch customer's order history
-- search_faq: RAG over FAQ + policy docs
-- handoff_to_returns: delegate to Returns agent if issue is a return
-"""
+"""Support agent: order status and how-things-work questions."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from crewai import Agent, Crew, Process, Task
+from src.agent import BaseAgent
+from src.tools.faq import TOOL as FAQ_TOOL
+from src.tools.orders import TOOL as ORDERS_TOOL
 
 
-SUPPORT_AGENT = None
+class SupportAgent(BaseAgent):
+    NAME = "support"
 
+    TOOLS = {
+        "lookup_orders": ORDERS_TOOL,
+        "search_faq": FAQ_TOOL,
+    }
 
-def get_support_agent() -> Agent:
-    global SUPPORT_AGENT
-    if SUPPORT_AGENT is None:
-        from src.tools.orders import lookup_orders_tool
-        from src.tools.faq import search_faq_tool
+    SYSTEM_PROMPT = """You are a retail customer support agent. You answer \
+questions about orders that have already been placed, and about how the \
+business operates.
 
-        SUPPORT_AGENT = Agent(
-            role="Customer Support Specialist",
-            goal=(
-                "Resolve customer questions and issues with empathy and efficiency. "
-                "Look up order details when needed. Search the FAQ for common answers. "
-                "Hand off to Returns agent for return/refund issues."
-            ),
-            backstory=(
-                "You are a patient, empathetic customer support specialist. You listen "
-                "carefully, acknowledge the customer's frustration, and provide clear "
-                "solutions. You never make promises you can't keep. If a customer asks "
-                "for a return or refund, you delegate to the Returns specialist."
-            ),
-            tools=[lookup_orders_tool(), search_faq_tool()],
-            llm="bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-            allow_delegation=True,  # Support can delegate to Returns
-            verbose=False,
+Rules you do not break:
+
+- Never state an order status, date, or amount that did not come back from \
+lookup_orders. If you cannot find the order, say so and ask the customer to \
+confirm the order number.
+- Answer policy and how-to questions from search_faq. If the FAQ does not \
+cover it, say you will need to check rather than guessing.
+- You cannot issue refunds. If the customer wants one, tell them you are \
+handing them to the returns team and stop there.
+- If a customer is upset, acknowledge it once, briefly, then deal with the \
+problem. Do not repeat apologies.
+
+Keep replies under about 60 words. These are often read aloud."""
+
+    def handle(self, customer_id: str, transcript: str, context: dict[str, Any]) -> str:
+        prompt = (
+            f"Customer id: {customer_id}\n"
+            f"They said: {transcript}\n"
+            f"What we already know: {context}\n\n"
+            "Help them."
         )
-    return SUPPORT_AGENT
+        return self.converse(prompt)
 
 
-SUPPORT_TASK_TEMPLATE = """You are a customer support specialist helping a customer with this request:
-
-Customer: {customer_id}
-Request: {transcript}
-Context: {context}
-
-Your job:
-1. Understand the customer's issue
-2. Look up their orders if relevant
-3. Search the FAQ for common answers
-4. If this is a return/refund request, hand off to the Returns agent
-5. Otherwise, provide a clear, helpful answer
-
-If you need to delegate to Returns, do so cleanly with full context.
-Be concise — voice responses under 30 seconds.
-"""
-
-
-def run_support_agent(customer_id: str | None, transcript: str, context: dict[str, Any]) -> str:
-    agent = get_support_agent()
-    task = Task(
-        description=SUPPORT_TASK_TEMPLATE.format(
-            customer_id=customer_id or "anonymous",
-            transcript=transcript,
-            context=context or {},
-        ),
-        expected_output="A concise, helpful response to the customer (under 200 words).",
-        agent=agent,
-    )
-    crew = Crew(agents=[agent], tasks=[task], process=Process.sequential, verbose=False)
-    result = crew.kickoff()
-    return str(result)
+def run_support_agent(
+    customer_id: str, transcript: str, context: dict[str, Any] | None = None
+) -> tuple[str, list[dict[str, Any]]]:
+    """Run the support agent and return its reply plus the tools it used."""
+    agent = SupportAgent()
+    reply = agent.run(customer_id, transcript, context or {})
+    return reply, agent.tool_calls

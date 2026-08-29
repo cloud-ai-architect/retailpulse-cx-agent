@@ -46,6 +46,7 @@ GitHub Actions needs to deploy infrastructure and update Lambda code. The tradit
 **Chosen option 3: GitHub OIDC** with `sub` claim scoped to `repo:cloud-ai-architect/retailpulse-cx-agent:ref:refs/heads/main` and `repo:cloud-ai-architect/retailpulse-cx-agent:pull_request`.
 
 Trust policy:
+
 ```json
 {
   "Effect": "Allow",

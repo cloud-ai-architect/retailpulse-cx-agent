@@ -24,6 +24,7 @@ security, operability, developer experience, time-to-market, regulatory.
 
 <!--
 List the realistic options considered. For each:
+
 - Brief description
 - Pros
 - Cons

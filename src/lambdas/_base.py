@@ -1,0 +1,74 @@
+"""Shared Lambda plumbing.
+
+Keeps each stage handler to its agent call: the HTTP envelope, argument
+extraction and error mapping are identical across stages and are handled
+here so a bug is fixed in one place.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+from src.common import RetailPulseError
+
+
+def parse_event(event: Any) -> dict[str, Any]:
+    """Return the request body from a direct, API Gateway, or Step Function event.
+
+    Typed as Any rather than dict: the annotation is a claim about our own
+    callers, and the Lambda runtime is not one of them. A malformed invocation
+    really can deliver a non-dict here, so the guard below is reachable even
+    though a stricter signature would say otherwise.
+    """
+    if not isinstance(event, dict):
+        return {}
+    body = event.get("body")
+    if isinstance(body, str):
+        try:
+            loaded: dict[str, Any] = json.loads(body)
+            return loaded
+        except json.JSONDecodeError:
+            return {}
+    if isinstance(body, dict):
+        return body
+    if isinstance(event.get("queryStringParameters"), dict):
+        return dict(event["queryStringParameters"])
+    return event
+
+
+def respond(status: int, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(payload),
+    }
+
+
+def run_stage(
+    event: dict[str, Any], required: list[str], fn: Callable[[dict[str, Any]], Any]
+) -> dict[str, Any]:
+    """Validate inputs, run the agent, and map failures to HTTP responses."""
+    data = parse_event(event)
+
+    missing = [k for k in required if not data.get(k)]
+    if missing:
+        return respond(
+            400,
+            {
+                "error": "MISSING_PARAMETERS",
+                "message": "required: {}".format(", ".join(missing)),
+            },
+        )
+
+    try:
+        return respond(200, {"result": fn(data)})
+    except RetailPulseError as exc:
+        # Model or validation failure: the caller's input may be at fault,
+        # and the message is safe to return.
+        return respond(502, {"error": type(exc).__name__, "message": str(exc)})
+    except Exception as exc:
+        return respond(500, {"error": "INTERNAL_ERROR", "message": str(exc)})
